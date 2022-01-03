@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# When clearing cache doesn't work nuke the damn thing.
+# This will clear all generated directories and run all
+# the neccessary commands to hopefully get your changes
+# to appear.
+#
+#
+# Example:
+#
+#   m2nuke
+#
+# Options:
+#   --skip-static-content
+
+# First check if we're in a Magento project.
+if [ ! -f "app/etc/env.php" ] && [ ! -f "./composer.json" ] && [ ! -f "bin/magento" ]; then
+    echo "You're not in the Magento root. Soooo... I'll avoid destroying this!"
+    exit 1
+fi
+
+magento_root=$(pwd -P)/
+
+directories=(
+    "var/cache/"
+    "var/page_cache/"
+    "var/view_preprocessed/"
+    "var/generation/"
+    "generated/"
+    "pub/static/frontend/"
+)
+
+while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
+  --skip-static-content)
+    skip_static_content=1
+    ;;
+esac; shift; done
+if [[ "$1" == '--' ]]; then shift; fi
+
+for directory in ${directories[@]}; do
+    if [[ -d ${directory} ]] && [[ $(ls -A ${directory}) ]]; then
+        cd ${directory}
+
+        echo " "
+        echo "==> Emptying ${directory} directory..."
+        find . ! -name .htaccess -delete
+
+        cd ${magento_root}
+    fi
+done
+
+echo " "
+echo "==> Clearing Magento cache (cache:clean)..."
+php bin/magento cache:clean
+
+echo " "
+echo "==> Clearing Magento cache (cache:flush)..."
+php bin/magento cache:flush
+
+echo " "
+echo "==> Running setup:di:compile..."
+php bin/magento setup:di:compile
+
+echo " "
+echo "==> Running setup:upgrade..."
+php bin/magento setup:upgrade --keep-generated
+
+if [[ ${skip_static_content} -ne 1 ]]; then
+    echo " "
+    echo "==> Deploying static content..."
+    php bin/magento setup:static-content:deploy -f
+fi
