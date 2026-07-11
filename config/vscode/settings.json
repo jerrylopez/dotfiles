@@ -28,5 +28,6 @@
   "editor.scrollbar.horizontal": "auto",
   "editor.scrollbar.vertical": "auto",
   "search.useIgnoreFiles": false,
-  "workbench.browser.showInTitleBar": false
+  "workbench.browser.showInTitleBar": false,
+  "files.insertFinalNewline": true
 }
