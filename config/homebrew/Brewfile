@@ -2,9 +2,7 @@ cask_args appdir: '/Applications'
 
 tap 'jondot/tap'
 tap 'mutagen-io/mutagen'
-tap 'homebrew/cask-fonts'
 tap 'homebrew/bundle'
-tap 'shopify/shopify'
 
 brew 'ack'
 brew 'coreutils'
