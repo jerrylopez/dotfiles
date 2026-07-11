@@ -5,8 +5,6 @@
 
 - clean: ["~", "~/.cache"]
 
-- create:
-
 - link:
     ~/.gitconfig: config/git/gitconfig
     ~/.gitignore: config/git/gitignore

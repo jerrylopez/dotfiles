@@ -29,8 +29,8 @@
 	required = true
 [user]
 	name = Jerry Lopez
-    email = jerry@92labs.com
+        email = jerry@92labs.com
 [github]
-    user = jerrylopez
+        user = jerrylopez
 [include]
         path = ~/.gitconfig.local
