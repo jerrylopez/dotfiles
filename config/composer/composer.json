@@ -1,0 +1,7 @@
+{
+    "require": {
+        "laravel/installer": "^5.26",
+        "statamic/cli": "^3.6",
+        "laravel-zero/installer": "^2.10"
+    }
+}

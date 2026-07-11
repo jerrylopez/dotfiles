@@ -1,0 +1,14 @@
+[
+    {
+        "key": "cmd+e",
+        "command": "workbench.action.showAllEditors"
+    },
+    {
+        "key": "cmd+1",
+        "command": "workbench.action.toggleSidebarVisibility"
+    },
+    {
+        "key": "cmd+0",
+        "command": "opensshremotes.openEmptyWindow"
+    }
+]

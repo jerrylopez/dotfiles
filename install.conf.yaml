@@ -1,0 +1,19 @@
+- defaults:
+    link:
+      relink: true
+      force: true
+
+- clean: ["~", "~/.cache"]
+
+- create:
+
+- link:
+    ~/.gitconfig: config/git/gitconfig
+    ~/.gitignore: config/git/gitignore
+    ~/.zshrc: config/zsh/zshrc
+    ~/Library/Application Support/Code/User/settings.json: config/vscode/settings.json
+    ~/Library/Application Support/Code/User/keybindings.json: config/vscode/keybindings.json
+    ~/.composer/composer.json: config/composer/composer.json
+
+- shell:
+    - [git submodule update --init --recursive]
