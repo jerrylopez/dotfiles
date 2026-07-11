@@ -1,19 +1,4 @@
 {
-  "model": "claude-fable-5[1m]",
-  "enabledPlugins": {
-    "hcf@hcf": true
-  },
-  "extraKnownMarketplaces": {
-    "hcf": {
-      "source": {
-        "source": "github",
-        "repo": "markshust/hcf"
-      }
-    }
-  },
-  "effortLevel": "high",
-  "skipDangerousModePermissionPrompt": true,
-  "theme": "dark-daltonized",
   "permissions": {
     "allow": [
       "Bash(gh:*)",
@@ -64,5 +49,20 @@
       "mcp__laravel-boost__*",
       "mcp__chrome-devtools__*"
     ]
-  }
+  },
+  "model": "claude-fable-5[1m]",
+  "enabledPlugins": {
+    "hcf@hcf": true
+  },
+  "extraKnownMarketplaces": {
+    "hcf": {
+      "source": {
+        "source": "github",
+        "repo": "markshust/hcf"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-daltonized"
 }
