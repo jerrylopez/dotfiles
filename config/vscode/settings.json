@@ -33,5 +33,6 @@
   "projectManager.git.baseFolders": [
     "/Volumes/CaseSensitive/Code"
   ],
-  "projectManager.projectsLocation": "~/.dotfiles/config/vscode"
+  "projectManager.projectsLocation": "~/.dotfiles/config/vscode",
+  "extensions.ignoreRecommendations": true
 }
