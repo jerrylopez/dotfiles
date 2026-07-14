@@ -1,5 +1,6 @@
 [alias]
         co = checkout
+        undo = reset --soft HEAD^
 [color]
         diff = auto
         status = auto
