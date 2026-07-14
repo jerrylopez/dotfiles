@@ -29,5 +29,9 @@
   "editor.scrollbar.vertical": "auto",
   "search.useIgnoreFiles": false,
   "workbench.browser.showInTitleBar": false,
-  "files.insertFinalNewline": true
+  "files.insertFinalNewline": true,
+  "projectManager.git.baseFolders": [
+    "/Volumes/CaseSensitive/Code"
+  ],
+  "projectManager.projectsLocation": "~/.dotfiles/config/vscode"
 }

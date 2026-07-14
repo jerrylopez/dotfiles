@@ -1,0 +1,10 @@
+[
+	{
+		"name": "dotfiles",
+		"rootPath": "~/.dotfiles",
+		"paths": [],
+		"tags": [],
+		"enabled": true,
+		"profile": ""
+	}
+]
