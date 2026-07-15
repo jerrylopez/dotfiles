@@ -15,6 +15,10 @@
         "key": "cmd+o",
         "command": "projectManager.listProjects"
     },
+    {
+        "key": "shift+cmd+o",
+        "command": "projectManager.listProjectsNewWindow"
+    }
 
     /*
     |--------------------------------------------------------------------------
