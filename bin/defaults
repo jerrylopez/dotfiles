@@ -39,6 +39,10 @@ defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
 defaults write com.apple.dock wvous-bl-corner -int 5
 defaults write com.apple.dock wvous-bl-modifier -int 0
 
+# Do not render the Desktop icons at all. Always clean :D
+defaults write com.apple.finder CreateDesktop false
+killall Finder
+
 # |----------------------------------------------------------------
 # | Safari
 # |----------------------------------------------------------------
