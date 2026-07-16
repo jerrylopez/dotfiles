@@ -34,5 +34,6 @@
     "/Volumes/CaseSensitive/Code"
   ],
   "projectManager.projectsLocation": "~/.dotfiles/config/vscode",
-  "extensions.ignoreRecommendations": true
+  "extensions.ignoreRecommendations": true,
+  "editor.scrollBeyondLastLine": false
 }
