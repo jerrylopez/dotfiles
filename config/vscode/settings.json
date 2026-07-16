@@ -35,5 +35,6 @@
   ],
   "projectManager.projectsLocation": "~/.dotfiles/config/vscode",
   "extensions.ignoreRecommendations": true,
-  "editor.scrollBeyondLastLine": false
+  "editor.scrollBeyondLastLine": false,
+  "workbench.editor.limit.value": 5
 }
