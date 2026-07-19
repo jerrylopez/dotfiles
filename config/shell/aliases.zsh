@@ -15,3 +15,8 @@ alias hosts="sudo vi /etc/hosts"
 alias nah='git reset --hard; git clean -df'
 alias co='git checkout'
 
+# |----------------------------------------------------------------
+# | PHP
+# |----------------------------------------------------------------
+
+alias a="php artisan"
