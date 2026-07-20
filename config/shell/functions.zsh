@@ -6,6 +6,10 @@ c() {
     cd "$PROJECTS/$1"
 }
 
+update() {
+    $DOTFILES/bin/update
+}
+
 extract () {
     if [ -f $1 ]; then
         case $1 in
