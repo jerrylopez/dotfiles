@@ -1,4 +1,9 @@
 {
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
   "permissions": {
     "allow": [
       "Bash(gh:*)",
@@ -50,9 +55,10 @@
       "mcp__chrome-devtools__*"
     ]
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "enabledPlugins": {
-    "hcf@hcf": true
+    "hcf@hcf": true,
+    "figma@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "hcf": {
@@ -60,14 +66,21 @@
         "source": "github",
         "repo": "markshust/hcf"
       }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    },
+    "wp-umbrella": {
+      "source": {
+        "source": "github",
+        "repo": "wp-umbrella/umbrella-skill"
+      }
     }
   },
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
-  "theme": "dark-daltonized",
-  "attribution": {
-    "commit": "",
-    "pr": "",
-    "sessionUrl": false
-  }
+  "theme": "dark-daltonized"
 }
