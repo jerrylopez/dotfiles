@@ -173,10 +173,47 @@ wt_run_hook() {
 
 # ------------------------------------------------------------------ init ----
 
+# Expand an "org/repo" shorthand into a full SSH URL, so the common case is the
+# short one. Everything else is passed through untouched:
+#
+#   a path that exists   cloning from a local repo is a real thing to do, and a
+#                        real path must always beat a guess about what was meant
+#   a scheme or a colon  https://…, ssh://…, git@host:org/repo — already addressed
+#   a leading / . or ~   a path that does not exist yet is still plainly a path
+#
+# GitHub over SSH is hardcoded below because that is how these repos are cloned;
+# a different host is a one-line change.
+wt_expand_url() {
+    local url="$1"
+
+    if [ -e "$url" ]; then
+        printf '%s' "$url"
+        return 0
+    fi
+
+    case "$url" in
+        *:*|/*|.*|~*)
+            printf '%s' "$url"
+            return 0
+            ;;
+    esac
+
+    # One slash exactly, and no leading dot, so this can only match a bare
+    # org/repo. The %.git keeps "org/repo.git" from becoming "…repo.git.git".
+    if [[ "$url" =~ ^[A-Za-z0-9_-][A-Za-z0-9._-]*/[A-Za-z0-9._-]+$ ]]; then
+        printf 'git@github.com:%s.git' "${url%.git}"
+        return 0
+    fi
+
+    printf '%s' "$url"
+}
+
 wt_cmd_init() {
     local url="${1:-}" dest="${2:-}" root branch
 
-    [ -n "$url" ] || wt_die "usage: wt init <repo-url> [directory]"
+    [ -n "$url" ] || wt_die "usage: wt init <org/repo|repo-url> [directory]"
+
+    url="$(wt_expand_url "$url")"
 
     if [ -z "$dest" ]; then
         dest="$(basename "$url")"
@@ -428,7 +465,10 @@ wt_usage() {
     cat >&2 <<'USAGE'
 usage: wt <command>
 
-  init <repo-url> [dir]        clone into dir/.git, scaffold .wt/, add the default branch
+  init <org/repo|url> [dir]    clone into dir/.git, scaffold .wt/, add the default branch
+                               org/repo expands to git@github.com:org/repo.git
+                               dir defaults to the repository name, and is what
+                               .wt/config derives the worktree suffix from
   add <name> [--base <ref>]    fetch origin, create worktrees/<name>, run .wt/hooks/add
   remove <name> [--force]      run .wt/hooks/remove, then destroy the worktree
   list                         list this project's worktrees
