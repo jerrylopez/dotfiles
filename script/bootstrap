@@ -13,6 +13,6 @@ fi
 
 brew bundle --file="${BASEDIR}/config/homebrew/Brewfile"
 
-"${BASEDIR}/bin/install"
+"${BASEDIR}/script/install"
 
-"${BASEDIR}/bin/defaults"
+"${BASEDIR}/script/defaults"

@@ -7,7 +7,7 @@ c() {
 }
 
 update() {
-    $DOTFILES/bin/update
+    $DOTFILES/script/update
 }
 
 extract () {
