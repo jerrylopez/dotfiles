@@ -1,0 +1,447 @@
+#!/usr/bin/env bash
+# wt: Manage a project as a bare repository with a directory of worktrees.
+#
+#   project/
+#   ├── .git/            the bare clone; nothing is ever checked out here
+#   ├── .wt/
+#   │   ├── config       sourced; names the suffix every worktree directory carries
+#   │   └── hooks/       add and remove, local-only and never committed
+#   └── worktrees/       one directory per worktree, and nothing else
+#
+# Keeping the worktrees in a directory of their own means that directory holds
+# worktrees and nothing but worktrees, so anything that scans it — a web server
+# looking for sites, a process manager looking for working directories — finds no
+# .git, no .wt and no local scratch files mixed in among them.
+#
+# wt knows how to create and destroy worktrees and nothing else. Everything a
+# particular project needs done to a new worktree — env files, dependencies,
+# services, ports — lives in .wt/hooks/add, which wt runs afterward as a
+# subprocess. Failures there stay contained: the worktree is never rolled back.
+#
+# Usage: wt <init|add|remove|list> ...
+
+set -euo pipefail
+
+# --------------------------------------------------------------- output ----
+
+wt_info() { printf '\033[0;36m==>\033[0m %s\n' "$*"; }
+wt_warn() { printf '\033[0;33m warn\033[0m %s\n' "$*" >&2; }
+wt_die()  { printf '\033[0;31merror\033[0m %s\n' "$*" >&2; exit 1; }
+
+# -------------------------------------------------------------- helpers ----
+
+# Worktrees are siblings in one flat directory, so a branch name that contains a
+# slash has to be flattened before it can name a directory.
+wt_slugify() { printf '%s' "$1" | tr '/' '-' | tr '[:upper:]' '[:lower:]'; }
+
+# The project root is the nearest ancestor that looks like one, so add and remove
+# work from anywhere inside the project — the root, a worktree, or deep inside one.
+#
+# .git alone cannot be the marker now that it is where the bare repo lives, since
+# every ordinary repository has one too. .wt is the real marker; the second test
+# recognizes a project laid out by hand before it had any hooks. Its git call is
+# gated behind two cheap ones because an ordinary repo with a worktrees/ directory
+# is the only thing that reaches it.
+wt_is_root() {
+    local dir="$1"
+
+    [ -d "$dir/.wt" ] && return 0
+
+    [ -d "$dir/.git" ] && [ -d "$dir/worktrees" ] &&
+        [ "$(git --git-dir="$dir/.git" config --get core.bare 2>/dev/null)" = true ]
+}
+
+wt_find_root() {
+    local dir
+    dir="$(cd "${1:-$PWD}" && pwd)"
+
+    while [ "$dir" != "/" ]; do
+        if wt_is_root "$dir"; then
+            printf '%s' "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+
+    return 1
+}
+
+wt_require_root() {
+    WT_ROOT="$(wt_find_root)" ||
+        wt_die "not inside a wt project (no .wt in any parent directory)"
+    WT_WORKTREES="$WT_ROOT/worktrees"
+    wt_load_config
+}
+
+# .wt/config is sourced, not parsed, so a project can derive its suffix rather than
+# repeat it — the name of the root and its parent are usually enough to build one.
+# It is read after the root is known and before any name is computed.
+wt_load_config() {
+    WT_SUFFIX=""
+    # shellcheck source=/dev/null
+    [ -f "$WT_ROOT/.wt/config" ] && . "$WT_ROOT/.wt/config"
+    return 0
+}
+
+# Worktree directories carry a suffix because the directory name is the only name
+# some tools ever see. Herd is the clear case: it serves a parked directory at
+# <dirname>.test, so two projects with a `main` worktree would claim the same
+# hostname. Making the directory unique makes the site, the namespace and the
+# process label unique with it, all from one string.
+wt_dir_for() { printf '%s%s' "$(wt_slugify "$1")" "$WT_SUFFIX"; }
+
+# An argument may be a branch name or the directory that branch produced, since the
+# directory is what tab-completion offers and what `wt list` prints.
+wt_resolve_dir() {
+    # Guarded because an empty suffix makes the pattern below match everything, and
+    # the argument would be taken as a directory name without ever being slugified.
+    [ -n "$WT_SUFFIX" ] || { wt_dir_for "$1"; return; }
+
+    case "$1" in
+        *"$WT_SUFFIX") printf '%s' "$1" ;;
+        *) wt_dir_for "$1" ;;
+    esac
+}
+
+wt_git() { git -C "$WT_ROOT" "$@"; }
+
+# The bare repo's HEAD names the default branch. Used only as the base ref for new
+# branches; it confers no other privilege and its worktree need not exist.
+wt_default_branch() { wt_git symbolic-ref --short HEAD 2>/dev/null || echo main; }
+
+# Refresh origin before anything reads a remote-tracking ref, so a new worktree
+# branches from what has actually been pushed rather than from whatever this clone
+# last happened to see.
+#
+# Never fatal. Being offline should cost you the freshness of the base ref, not the
+# ability to create a worktree at all — the refs already on disk are still perfectly
+# good to branch from, they are just older. A project with no origin skips silently,
+# since there is nothing to be out of date with.
+wt_fetch() {
+    if [ -n "${WT_FETCHED:-}" ]; then
+        return 0
+    fi
+
+    if ! wt_git remote get-url origin >/dev/null 2>&1; then
+        return 0
+    fi
+
+    wt_info "fetching origin"
+
+    if wt_git fetch origin; then
+        WT_FETCHED=1
+    else
+        wt_warn "could not fetch origin; branching from the refs this clone already has"
+    fi
+}
+
+# Emit "<path>\t<branch>" per worktree, sorted by path, skipping the bare repo.
+#
+# Exported to hooks because the questions a worktree cannot answer alone are all
+# about its siblings: which ports are taken, what belongs in a manifest listing
+# every one of them. On the remove hook this still includes the worktree being
+# removed, since it has not been destroyed yet.
+wt_worktrees() {
+    git -C "$WT_ROOT" worktree list --porcelain | awk '
+        /^worktree / { path = substr($0, 10); branch = "" }
+        /^branch /   { branch = substr($0, 8); sub(/^refs\/heads\//, "", branch) }
+        /^bare$/     { path = "" }
+        /^$/         { if (path != "") print path "\t" branch; path = "" }
+        END          { if (path != "") print path "\t" branch }
+    ' | sort
+}
+
+# ----------------------------------------------------------------- hooks ----
+
+# Hooks run as subprocesses, never sourced, so a hook that dies or calls exit
+# cannot take wt down with it and cannot leave stray state in this shell.
+#
+# export -f is why this script is bash and not sh. It only carries the helpers to
+# hooks that are themselves bash; a Python or Node hook sees them as unparsed
+# environment variables and should use its own output functions.
+wt_run_hook() {
+    local hook="$WT_ROOT/.wt/hooks/$1"
+
+    [ -x "$hook" ] || return 0
+
+    export -f wt_info wt_warn wt_die wt_slugify wt_worktrees
+    export WT_ROOT WT_WORKTREES WT_SUFFIX WT_NAME WT_DIR WT_PATH WT_BRANCH
+
+    wt_info "running .wt/hooks/$1"
+    ( cd "$WT_ROOT" && "$hook" )
+}
+
+# ------------------------------------------------------------------ init ----
+
+wt_cmd_init() {
+    local url="${1:-}" dest="${2:-}" root branch
+
+    [ -n "$url" ] || wt_die "usage: wt init <repo-url> [directory]"
+
+    if [ -z "$dest" ]; then
+        dest="$(basename "$url")"
+        dest="${dest%.git}"
+    fi
+
+    [ -e "$dest" ] && wt_die "$dest already exists"
+
+    mkdir -p "$dest"
+    root="$(cd "$dest" && pwd)"
+
+    # The bare repo goes straight into .git, which is where git looks anyway. The
+    # root therefore needs no gitlink and no configuration: plain git commands work
+    # there because it is an ordinary repository that simply has no working tree.
+    wt_info "cloning $url into $dest/.git"
+    git clone --bare "$url" "$root/.git"
+
+    # A bare clone fetches into refs/heads/* and writes no remote-tracking refspec,
+    # so origin/* never exists and `wt add` could not tell a remote branch from a
+    # new one. Restoring the refspec is what makes the bare repo behave like a
+    # normal clone that merely has no working tree of its own.
+    git --git-dir="$root/.git" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+    git --git-dir="$root/.git" fetch origin
+
+    # The first worktree is created moments from now; it does not need a second one.
+    WT_FETCHED=1
+
+    mkdir -p "$root/worktrees"
+    wt_scaffold_config "$root"
+    wt_scaffold_hooks "$root"
+
+    WT_ROOT="$root"
+    WT_WORKTREES="$root/worktrees"
+    wt_load_config
+    branch="$(wt_default_branch)"
+
+    wt_info "creating the first worktree"
+    wt_cmd_add "$branch"
+
+    wt_info "initialized $dest — edit $dest/.wt/hooks/ to teach it about this project"
+}
+
+# The generated default reproduces the convention this tool was extracted from:
+# the root and its parent name the project and whoever it belongs to, which is
+# specific enough that no two projects on one machine collide.
+wt_scaffold_config() {
+    local root="$1"
+
+    [ -e "$root/.wt/config" ] && return 0
+
+    mkdir -p "$root/.wt"
+
+    cat >"$root/.wt/config" <<'CONFIG'
+# .wt/config — sourced by wt once the project root is known. Local-only.
+#
+# WT_SUFFIX is appended to every worktree directory name. It exists because the
+# directory name is the only name some tools ever see: Herd serves a parked
+# directory at <dirname>.test, so without a suffix two projects that both have a
+# `main` worktree would claim the same hostname. One string then names the site,
+# the cache namespace and the process label alike.
+#
+# This file is sourced, so derive it rather than repeating it. $WT_ROOT is set.
+# Set it to "" for plain directory names that match the branch exactly.
+
+WT_SUFFIX="-$(basename "$WT_ROOT").$(basename "$(dirname "$WT_ROOT")")"
+CONFIG
+}
+
+# The stubs are generated executable and carry their whole contract in a comment,
+# because that comment is the only documentation this tool has.
+wt_scaffold_hooks() {
+    local root="$1" name when
+
+    mkdir -p "$root/.wt/hooks"
+
+    for name in add remove; do
+        [ -e "$root/.wt/hooks/$name" ] && continue
+
+        if [ "$name" = add ]; then
+            when="runs after wt has created the worktree."
+        else
+            when="runs before wt destroys the worktree, while it still exists."
+        fi
+
+        cat >"$root/.wt/hooks/$name" <<STUB
+#!/usr/bin/env bash
+# .wt/hooks/$name — $when
+#
+# Local-only. Not committed, not copied into worktrees, identical for all of them.
+# To keep this logic in version control instead, make this file a one-line shim
+# into a script the repo does commit:
+#
+#     exec "\$WT_PATH/script/worktree-$name"
+#
+# Environment:
+#   WT_ROOT        project root, holding .git, .wt and worktrees
+#   WT_WORKTREES   \$WT_ROOT/worktrees, where every worktree lives
+#   WT_SUFFIX      the suffix from .wt/config, already applied to WT_DIR
+#   WT_NAME        name as given to wt, e.g. feature/login
+#   WT_DIR         its directory name, slugified and suffixed
+#   WT_PATH        \$WT_WORKTREES/\$WT_DIR, the worktree itself
+#   WT_BRANCH      the branch checked out in it
+#
+# WT_DIR is what Herd serves and what every namespace should be built from, so
+# prefer it over WT_NAME anywhere a name has to be unique across projects.
+#
+# Exported functions, available to bash hooks only:
+#   wt_info MSG     wt_warn MSG     wt_die MSG     wt_slugify STR
+#   wt_worktrees    emits "<path>\\t<branch>" per worktree, sorted by path
+#
+# The working directory is \$WT_ROOT, not the worktree — so that a hook writing a
+# root-level file (a process manifest, a registry) and a hook working inside the
+# worktree both spell their paths the same way.
+#
+# Exiting nonzero makes wt exit with the same code. Nothing is rolled back:
+# on add the worktree is left in place, on remove it is left undestroyed.
+
+set -euo pipefail
+
+wt_info "\$WT_NAME: nothing to do yet"
+STUB
+
+        chmod +x "$root/.wt/hooks/$name"
+    done
+}
+
+# ------------------------------------------------------------------- add ----
+
+wt_cmd_add() {
+    local name="" base="" status=0
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --base) base="${2:?--base needs a ref}"; shift 2 ;;
+            -*) wt_die "unknown flag: $1" ;;
+            *) name="$1"; shift ;;
+        esac
+    done
+
+    [ -n "$name" ] || wt_die "usage: wt add <name> [--base <ref>]"
+    [ -n "${WT_ROOT:-}" ] || wt_require_root
+
+    WT_NAME="$name"
+    WT_DIR="$(wt_dir_for "$name")"
+    WT_PATH="$WT_WORKTREES/$WT_DIR"
+    WT_BRANCH="$name"
+
+    [ -e "$WT_PATH" ] && wt_die "$WT_DIR already exists"
+
+    # After the guard above, so a name that was never going to work fails without
+    # waiting on the network, and before base resolution, which reads origin/*.
+    wt_fetch
+
+    mkdir -p "$WT_WORKTREES"
+
+    # An unqualified `wt add` branches from the remote's default branch when there
+    # is one, so a new worktree starts from what has been pushed rather than from
+    # whatever the local default branch happens to be sitting on.
+    if [ -z "$base" ]; then
+        local default
+        default="$(wt_default_branch)"
+
+        if wt_git show-ref --verify --quiet "refs/remotes/origin/$default"; then
+            base="origin/$default"
+        elif wt_git show-ref --verify --quiet "refs/heads/$default"; then
+            base="$default"
+        else
+            base="HEAD"
+        fi
+    fi
+
+    if wt_git show-ref --verify --quiet "refs/heads/$name"; then
+        wt_info "checking out existing branch $name"
+        wt_git worktree add "$WT_PATH" "$name"
+    elif wt_git show-ref --verify --quiet "refs/remotes/origin/$name"; then
+        wt_info "tracking origin/$name"
+        wt_git worktree add --track -b "$name" "$WT_PATH" "origin/$name"
+    else
+        wt_info "creating branch $name from $base"
+        wt_git worktree add -b "$name" "$WT_PATH" "$base"
+    fi
+
+    # The `if` is what keeps errexit from aborting here: a failing hook has to be
+    # reported as a half-finished worktree, not as wt itself falling over.
+    if wt_run_hook add; then
+        wt_info "$WT_DIR ready"
+    else
+        status=$?
+        wt_warn "the add hook exited $status"
+        wt_warn "$WT_DIR exists and is checked out; whatever the hook does was not finished"
+        return "$status"
+    fi
+}
+
+# ---------------------------------------------------------------- remove ----
+
+wt_cmd_remove() {
+    local target="" force=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force|-f) force="--force"; shift ;;
+            -*) wt_die "unknown flag: $1" ;;
+            *) target="$1"; shift ;;
+        esac
+    done
+
+    [ -n "$target" ] || wt_die "usage: wt remove <name> [--force]"
+    wt_require_root
+
+    WT_NAME="$target"
+    WT_DIR="$(wt_resolve_dir "$target")"
+    WT_PATH="$WT_WORKTREES/$WT_DIR"
+
+    [ -d "$WT_PATH" ] || wt_die "$WT_DIR does not exist"
+
+    WT_BRANCH="$(git -C "$WT_PATH" symbolic-ref --short HEAD 2>/dev/null || echo '')"
+
+    # The hook runs before the directory is destroyed, because anything it tears
+    # down — containers, volumes, a port registration — is described by files that
+    # are about to disappear.
+    #
+    # That ordering has a cost: a `git worktree remove` that then refuses leaves a
+    # worktree whose services have already been dismantled. So refuse first, for
+    # the same reason git would. A dirty tree is the case git actually rejects, and
+    # checking it here means the hook only ever runs when the removal will land.
+    if [ -z "$force" ] && [ -n "$(git -C "$WT_PATH" status --porcelain 2>/dev/null)" ]; then
+        wt_die "$WT_DIR has uncommitted or untracked files. Re-run with --force to discard them."
+    fi
+
+    wt_run_hook remove
+
+    wt_git worktree remove ${force:+$force} "$WT_PATH" ||
+        wt_die "could not remove $WT_DIR"
+
+    wt_info "removed $WT_DIR (branch ${WT_BRANCH:-$target} left intact)"
+}
+
+# ------------------------------------------------------------------ list ----
+
+wt_cmd_list() {
+    wt_require_root
+    wt_git worktree list
+}
+
+# ------------------------------------------------------------------ main ----
+
+wt_usage() {
+    cat >&2 <<'USAGE'
+usage: wt <command>
+
+  init <repo-url> [dir]        clone into dir/.git, scaffold .wt/, add the default branch
+  add <name> [--base <ref>]    fetch origin, create worktrees/<name>, run .wt/hooks/add
+  remove <name> [--force]      run .wt/hooks/remove, then destroy the worktree
+  list                         list this project's worktrees
+
+Run from anywhere inside a wt project; the root is found by walking up.
+USAGE
+    exit 1
+}
+
+case "${1:-}" in
+    init)   shift; wt_cmd_init "$@" ;;
+    add)    shift; wt_cmd_add "$@" ;;
+    remove) shift; wt_cmd_remove "$@" ;;
+    list)   shift; wt_cmd_list "$@" ;;
+    *)      wt_usage ;;
+esac
