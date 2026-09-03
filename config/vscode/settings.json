@@ -3,7 +3,7 @@
   "workbench.secondarySideBar.defaultVisibility": "hidden",
   "task.allowAutomaticTasks": "on",
   "explorer.confirmDelete": false,
-  "claudeCode.preferredLocation": "panel",
+  "claudeCode.preferredLocation": "sidebar",
   "window.commandCenter": false,
   "breadcrumbs.enabled": false,
   "editor.minimap.enabled": false,    
@@ -36,5 +36,9 @@
   "projectManager.projectsLocation": "~/.dotfiles/config/vscode",
   "extensions.ignoreRecommendations": true,
   "editor.scrollBeyondLastLine": false,
-  "workbench.editor.limit.value": 5
+  "workbench.editor.limit.value": 5,
+  "telemetry.feedback.enabled": false,
+  "workbench.experimental.modernUI": true,
+  "git.detectWorktrees": true,
+  "workbench.startupEditor": "none"
 }
