@@ -53,7 +53,11 @@ wt_is_root() {
 
 wt_find_root() {
     local dir
-    dir="$(cd "${1:-$PWD}" && pwd)"
+
+    # A path that cannot be entered is simply not in a project, and saying so is
+    # the caller's job. Letting cd report it here would put a raw shell error in
+    # front of the real message.
+    dir="$(cd "${1:-$PWD}" 2>/dev/null && pwd)" || return 1
 
     while [ "$dir" != "/" ]; do
         if wt_is_root "$dir"; then
