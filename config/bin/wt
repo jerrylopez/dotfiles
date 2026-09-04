@@ -484,13 +484,24 @@ wt_cmd_list() {
         }
 
         END {
+            # A header over an empty list says nothing, so an empty project
+            # stays silent rather than printing column names with no columns.
+            if (count == 0) exit
+
+            # The header is part of the widest-cell calculation, otherwise a
+            # project whose names are all shorter than "WORKTREE" misaligns.
+            if (length("WORKTREE") > width) width = length("WORKTREE")
+
+            printf "%-" width "s  %-7s  %s\n", "WORKTREE", "COMMIT", "BRANCH"
+
             for (i = 1; i <= count; i++) {
-                # A detached worktree has no branch to name, so it gets none
-                # rather than an empty pair of brackets.
+                # A detached worktree has no branch to name. Its row simply ends
+                # after the commit rather than padding out to a blank cell and
+                # leaving trailing whitespace on the line.
                 if (ref[i] == "")
                     printf "%-" width "s  %s\n", dir[i], sha[i]
                 else
-                    printf "%-" width "s  %s  [%s]\n", dir[i], sha[i], ref[i]
+                    printf "%-" width "s  %-7s  %s\n", dir[i], sha[i], ref[i]
             }
         }
     '
