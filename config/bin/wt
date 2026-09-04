@@ -415,45 +415,90 @@ wt_cmd_add() {
 # ---------------------------------------------------------------- remove ----
 
 wt_cmd_remove() {
-    local target="" force=""
+    local force="" arg dir path seen=" " problems=0 failures=0
+    local targets=() names=() dirs=() paths=()
 
     while [ $# -gt 0 ]; do
         case "$1" in
             --force|-f) force="--force"; shift ;;
             -*) wt_die "unknown flag: $1" ;;
-            *) target="$1"; shift ;;
+            *) targets+=("$1"); shift ;;
         esac
     done
 
-    [ -n "$target" ] || wt_die "usage: wt remove <name> [--force]"
+    [ "${#targets[@]}" -gt 0 ] || wt_die "usage: wt remove <name>... [--force]"
     wt_require_root
 
-    WT_NAME="$target"
-    WT_DIR="$(wt_resolve_dir "$target")"
-    WT_PATH="$WT_WORKTREES/$WT_DIR"
-
-    [ -d "$WT_PATH" ] || wt_die "$WT_DIR does not exist"
-
-    WT_BRANCH="$(git -C "$WT_PATH" symbolic-ref --short HEAD 2>/dev/null || echo '')"
-
-    # The hook runs before the directory is destroyed, because anything it tears
-    # down — containers, volumes, a port registration — is described by files that
-    # are about to disappear.
+    # --- check every target before removing any ---------------------------------
     #
-    # That ordering has a cost: a `git worktree remove` that then refuses leaves a
-    # worktree whose services have already been dismantled. So refuse first, for
-    # the same reason git would. A dirty tree is the case git actually rejects, and
-    # checking it here means the hook only ever runs when the removal will land.
-    if [ -z "$force" ] && [ -n "$(git -C "$WT_PATH" status --porcelain 2>/dev/null)" ]; then
-        wt_die "$WT_DIR has uncommitted or untracked files. Re-run with --force to discard them."
-    fi
+    # Removal destroys a directory and whatever the hook tears down with it, so a
+    # typo in the third name must not cost you the first two. Nothing is removed
+    # until all of them pass, and every problem is reported in one go rather than
+    # one re-run at a time.
+    for arg in "${targets[@]}"; do
+        dir="$(wt_resolve_dir "$arg")"
+        path="$WT_WORKTREES/$dir"
 
-    wt_run_hook remove
+        # Named twice, or named once by branch and once by directory. Either way
+        # it is one worktree, and the second removal would only fail.
+        case "$seen" in
+            *" $dir "*) continue ;;
+        esac
+        seen="$seen$dir "
 
-    wt_git worktree remove ${force:+$force} "$WT_PATH" ||
-        wt_die "could not remove $WT_DIR"
+        if [ ! -d "$path" ]; then
+            wt_warn "$dir does not exist"
+            problems=$((problems + 1))
+            continue
+        fi
 
-    wt_info "removed $WT_DIR (branch ${WT_BRANCH:-$target} left intact)"
+        # The same refusal git would make, checked here so the hook only ever runs
+        # when the removal will land.
+        if [ -z "$force" ] && [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+            wt_warn "$dir has uncommitted or untracked files (--force discards them)"
+            problems=$((problems + 1))
+            continue
+        fi
+
+        names+=("$arg")
+        dirs+=("$dir")
+        paths+=("$path")
+    done
+
+    [ "$problems" -eq 0 ] || wt_die "nothing was removed"
+
+    # --- remove them ------------------------------------------------------------
+    #
+    # Past this point each worktree is independent, so one that fails is reported
+    # and the rest still go. Stopping halfway would leave the batch half-done for
+    # no benefit.
+    local i=0
+    while [ "$i" -lt "${#dirs[@]}" ]; do
+        WT_NAME="${names[$i]}"
+        WT_DIR="${dirs[$i]}"
+        WT_PATH="${paths[$i]}"
+        WT_BRANCH="$(git -C "$WT_PATH" symbolic-ref --short HEAD 2>/dev/null || echo '')"
+        i=$((i + 1))
+
+        # The hook runs before the directory is destroyed, because anything it
+        # tears down — containers, volumes, a port registration — is described by
+        # files that are about to disappear.
+        if ! wt_run_hook remove; then
+            wt_warn "the remove hook failed for $WT_DIR; it was left in place"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        if ! wt_git worktree remove ${force:+$force} "$WT_PATH"; then
+            wt_warn "could not remove $WT_DIR"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        wt_info "removed $WT_DIR (branch ${WT_BRANCH:-$WT_NAME} left intact)"
+    done
+
+    [ "$failures" -eq 0 ] || return 1
 }
 
 # ------------------------------------------------------------------ list ----
@@ -518,7 +563,8 @@ usage: wt <command>
                                dir defaults to the repository name, and is what
                                .wt/config derives the worktree suffix from
   add <name> [--base <ref>]    fetch origin, create worktrees/<name>, run .wt/hooks/add
-  remove <name> [--force]      run .wt/hooks/remove, then destroy the worktree
+  remove <name>... [--force]   run .wt/hooks/remove, then destroy each worktree
+                               nothing is removed unless every name checks out
   list                         list this project's worktrees
 
 Run from anywhere inside a wt project; the root is found by walking up.
