@@ -458,9 +458,42 @@ wt_cmd_remove() {
 
 # ------------------------------------------------------------------ list ----
 
+# Only the directory name, because the path above it is identical on every row and
+# is the project you are already in. The bare repo is left out for the same reason
+# it is invisible everywhere else in this tool: it has no working tree, so nothing
+# you can do to a worktree applies to it.
 wt_cmd_list() {
     wt_require_root
-    wt_git worktree list
+
+    wt_git worktree list --porcelain | awk '
+        /^worktree /  { path = substr($0, 10) }
+        /^HEAD /      { head = substr($0, 6, 7) }
+        /^branch /    { branch = substr($0, 8); sub(/^refs\/heads\//, "", branch) }
+        /^bare$/      { bare = 1 }
+
+        /^$/ {
+            if (path != "" && bare != 1) {
+                n = split(path, parts, "/")
+                count++
+                dir[count] = parts[n]
+                sha[count] = head
+                ref[count] = branch
+                if (length(parts[n]) > width) width = length(parts[n])
+            }
+            path = ""; head = ""; branch = ""; bare = 0
+        }
+
+        END {
+            for (i = 1; i <= count; i++) {
+                # A detached worktree has no branch to name, so it gets none
+                # rather than an empty pair of brackets.
+                if (ref[i] == "")
+                    printf "%-" width "s  %s\n", dir[i], sha[i]
+                else
+                    printf "%-" width "s  %s  [%s]\n", dir[i], sha[i], ref[i]
+            }
+        }
+    '
 }
 
 # ------------------------------------------------------------------ main ----
