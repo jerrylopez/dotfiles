@@ -15,6 +15,7 @@
     ~/.claude/settings.json: config/claude/settings.json
     ~/.claude/skills: config/agents/skills
     ~/.agents/skills: config/agents/skills
+    ~/.agents/.skill-lock.json: config/agents/.skill-lock.json
 
 
 - shell:
