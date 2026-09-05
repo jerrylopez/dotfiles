@@ -20,3 +20,6 @@ alias co='git checkout'
 # |----------------------------------------------------------------
 
 alias a="php artisan"
+alias laravel="cpx laravel/installer"
+alias forge="cpx laravel/forge-cli"
+alias cloud="cpx laravel/cloud-cli"
