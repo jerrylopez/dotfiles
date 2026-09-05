@@ -53,6 +53,8 @@ _wt() {
         'add:create a worktree, then run .wt/hooks/add'
         'remove:run .wt/hooks/remove, then destroy worktrees'
         'list:list this project'"'"'s worktrees'
+        'claude:choose a worktree and start claude in it'
+        'hook:answer Claude Code'"'"'s worktree hooks on stdin'
     )
 
     _arguments -C '1: :->command' '*:: :->argument'
@@ -78,6 +80,13 @@ _wt() {
                     _arguments \
                         '1:repository:' \
                         '2:directory:_files -/'
+                    ;;
+                claude)
+                    # Only -w is wt's to complete; the rest of the line belongs
+                    # to claude and is passed through untouched.
+                    _arguments \
+                        '(-w --worktree)'{-w,--worktree}'[open this worktree instead of choosing]:worktree:_wt_worktrees' \
+                        '*::claude argument:'
                     ;;
             esac
             ;;

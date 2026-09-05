@@ -666,6 +666,83 @@ wt_cmd_hook() {
     esac
 }
 
+# ---------------------------------------------------------------- claude ----
+
+# Open a Claude Code session in one of this project's worktrees, choosing it from
+# a list rather than remembering its name.
+#
+# The worktree hook is handed to claude inline with --settings, which takes a JSON
+# string as readily as a file. That is what keeps this a generic command: nothing
+# has to be configured in this project or in your user settings for it to work,
+# and no other repository inherits a hook that would only fail there. A hook is
+# all-or-nothing to Claude Code — a WorktreeCreate that errors, or prints nothing,
+# aborts the session rather than falling back — so a hook that only makes sense
+# inside a wt project has no business being installed globally.
+#
+# Everything after `wt claude` goes to claude untouched. Passing -w or --worktree
+# yourself skips the picker, which is how this stays usable from a script.
+wt_cmd_claude() {
+    local self cmd settings target arg has_worktree=""
+    local -a items dirs
+    local path branch dir
+
+    command -v claude >/dev/null 2>&1 || wt_die "claude is not on PATH"
+    command -v jq >/dev/null 2>&1 || wt_die "wt claude needs jq to build the hook settings"
+
+    wt_require_root
+
+    for arg in "$@"; do
+        case "$arg" in
+            -w|--worktree) has_worktree=1 ;;
+        esac
+    done
+
+    # The hook is named by absolute path rather than by `wt`, so the session runs
+    # this same script whatever PATH it happens to inherit.
+    self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+    cmd="\"$self\" hook"
+    settings="$(jq -nc --arg c "$cmd" '{
+        hooks: {
+            WorktreeCreate: [ { hooks: [ { type: "command", command: $c } ] } ],
+            WorktreeRemove: [ { hooks: [ { type: "command", command: $c } ] } ]
+        }
+    }')"
+
+    if [ -n "$has_worktree" ]; then
+        exec claude --settings "$settings" "$@"
+    fi
+
+    while IFS=$'\t' read -r path branch; do
+        dir="$(basename "$path")"
+        dirs+=("$dir")
+
+        # Only a directory that does not derive from its branch — one named with
+        # --as — says nothing about what it holds, and that is the only case
+        # worth spending a second column on.
+        if [ -n "$branch" ] && [ "$(wt_dir_for "$branch")" != "$dir" ]; then
+            items+=("$dir  [$branch]")
+        else
+            items+=("$dir")
+        fi
+    done < <(wt_worktrees)
+
+    [ "${#dirs[@]}" -gt 0 ] || wt_die "this project has no worktrees yet: wt add <name>"
+
+    [ -t 0 ] ||
+        wt_die "choosing a worktree needs a terminal; name one instead: wt claude -w <name>"
+
+    PS3="worktree> "
+    select target in "${items[@]}"; do
+        [ -n "$target" ] && break
+        wt_warn "choose one of the numbers above"
+    done
+
+    # An EOF at the prompt leaves nothing chosen, and is a decision not to start.
+    [ -n "${REPLY:-}" ] && [ -n "$target" ] || wt_die "no worktree chosen"
+
+    exec claude --settings "$settings" --worktree "${dirs[$((REPLY - 1))]}" "$@"
+}
+
 # ------------------------------------------------------------------ main ----
 
 wt_usage() {
@@ -682,6 +759,8 @@ usage: wt <command>
   remove <name>... [--force]   run .wt/hooks/remove, then destroy each worktree
                                nothing is removed unless every name checks out
   list                         list this project's worktrees
+  claude [claude-args...]      choose a worktree, then start claude in it
+                               -w <name> among the args skips the picker
   hook                         answer Claude Code's worktree hooks on stdin, so
                                `claude -w <name>` opens the worktree wt already made
 
@@ -696,5 +775,6 @@ case "${1:-}" in
     remove) shift; wt_cmd_remove "$@" ;;
     list)   shift; wt_cmd_list "$@" ;;
     hook)   shift; wt_cmd_hook "$@" ;;
+    claude) shift; wt_cmd_claude "$@" ;;
     *)      wt_usage ;;
 esac
