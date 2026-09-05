@@ -94,17 +94,59 @@ wt_load_config() {
 # process label unique with it, all from one string.
 wt_dir_for() { printf '%s%s' "$(wt_slugify "$1")" "$WT_SUFFIX"; }
 
+# A directory name that is too long is not a naming preference, it is a worktree
+# that cannot be served. The limit that bites is TLS: the certificate a local web
+# server issues per site carries the hostname in the X.509 commonName, which
+# OpenSSL caps at 64 characters. Past that the certificate is never generated,
+# and a site configured to use one that does not exist can take the whole web
+# server down with it — for every project on the machine, not just this one.
+#
+# wt does not know what TLD anything is served at, so the budget is the project's
+# to set: WT_MAX_DIR in .wt/config, already the file that defines the suffix
+# eating into it. Unset means the project does not care.
+#
+# Checked before the worktree is created, because the failure it prevents surfaces
+# nowhere near here and reads as the web server being broken.
+wt_check_dir_length() {
+    local dir="$1" branch="$2"
+
+    [ -n "${WT_MAX_DIR:-}" ] || return 0
+    [ "${#dir}" -le "$WT_MAX_DIR" ] || {
+        wt_warn "$dir is ${#dir} characters; this project's limit is $WT_MAX_DIR"
+        wt_warn "a longer name than that cannot be issued a TLS certificate"
+        wt_die  "name the directory explicitly: wt add $branch --as <short-name>"
+    }
+}
+
+# The directory a branch is checked out in, or nothing if no worktree holds it.
+# git already records the pairing, so a directory named with --as needs nothing
+# written down anywhere to be found again by branch.
+wt_dir_for_branch() {
+    wt_worktrees | awk -F'\t' -v b="$1" '$2 == b { n = split($1, p, "/"); print p[n]; exit }'
+}
+
 # An argument may be a branch name or the directory that branch produced, since the
 # directory is what tab-completion offers and what `wt list` prints.
 wt_resolve_dir() {
+    local derived looked_up
+
     # Guarded because an empty suffix makes the pattern below match everything, and
     # the argument would be taken as a directory name without ever being slugified.
     [ -n "$WT_SUFFIX" ] || { wt_dir_for "$1"; return; }
 
     case "$1" in
-        *"$WT_SUFFIX") printf '%s' "$1" ;;
-        *) wt_dir_for "$1" ;;
+        *"$WT_SUFFIX") printf '%s' "$1"; return ;;
     esac
+
+    # Deriving first keeps the common case a pure string operation, and keeps a
+    # derived directory winning over a branch of the same name checked out
+    # somewhere else. Only when that directory is absent is it worth asking git,
+    # which is the only way to resolve a directory named with --as.
+    derived="$(wt_dir_for "$1")"
+    [ -d "$WT_WORKTREES/$derived" ] && { printf '%s' "$derived"; return; }
+
+    looked_up="$(wt_dir_for_branch "$1")"
+    printf '%s' "${looked_up:-$derived}"
 }
 
 wt_git() { git -C "$WT_ROOT" "$@"; }
@@ -347,25 +389,32 @@ STUB
 # ------------------------------------------------------------------- add ----
 
 wt_cmd_add() {
-    local name="" base="" status=0
+    local name="" base="" as="" status=0
 
     while [ $# -gt 0 ]; do
         case "$1" in
             --base) base="${2:?--base needs a ref}"; shift 2 ;;
+            --as) as="${2:?--as needs a name}"; shift 2 ;;
             -*) wt_die "unknown flag: $1" ;;
             *) name="$1"; shift ;;
         esac
     done
 
-    [ -n "$name" ] || wt_die "usage: wt add <name> [--base <ref>]"
+    [ -n "$name" ] || wt_die "usage: wt add <name> [--base <ref>] [--as <dir-name>]"
     [ -n "${WT_ROOT:-}" ] || wt_require_root
 
+    # The directory is what names the site, so it is allowed to differ from the
+    # branch. Deriving it is the default because a name you can guess from the
+    # branch you are on is worth more than a prettier one you have to look up;
+    # --as exists for the branches where the derived name will not do.
     WT_NAME="$name"
-    WT_DIR="$(wt_dir_for "$name")"
+    WT_DIR="$(wt_dir_for "${as:-$name}")"
     WT_PATH="$WT_WORKTREES/$WT_DIR"
     WT_BRANCH="$name"
 
     [ -e "$WT_PATH" ] && wt_die "$WT_DIR already exists"
+
+    wt_check_dir_length "$WT_DIR" "$name"
 
     # After the guard above, so a name that was never going to work fails without
     # waiting on the network, and before base resolution, which reads origin/*.
@@ -552,6 +601,71 @@ wt_cmd_list() {
     '
 }
 
+# ------------------------------------------------------------------ hook ----
+
+# Claude Code's worktree hooks, so `claude -w <name>` opens the worktree that
+# `wt add <name>` already made instead of creating one of its own under
+# .claude/worktrees. That is the whole job: this hook resolves a name to a path
+# and never creates, provisions or destroys anything.
+#
+# Configure both events to run `wt hook` in the project's .claude/settings.json.
+#
+#   WorktreeCreate   {"hook_event_name":…,"cwd":…,"name":…}
+#                    "name" is exactly what was passed to -w. Claude Code reads
+#                    stdout as the worktree path, so nothing else may go there.
+#
+#   WorktreeRemove   {"hook_event_name":…,"cwd":…,"worktree_path":…}
+#                    Deliberately does nothing, and succeeding is the point:
+#                    a handled removal is one Claude Code does not perform
+#                    itself, which is what stops a session ending from deleting
+#                    a worktree you made. Worktrees outlive sessions here; they
+#                    go when `wt remove` says so.
+wt_cmd_hook() {
+    local payload event cwd name dir path
+
+    command -v jq >/dev/null 2>&1 || wt_die "wt hook needs jq to read the payload"
+
+    payload="$(cat)"
+    [ -n "$payload" ] || wt_die "wt hook expects a JSON payload on stdin"
+
+    event="$(printf '%s' "$payload" | jq -r '.hook_event_name // empty')"
+
+    case "$event" in
+        WorktreeCreate)
+            name="$(printf '%s' "$payload" | jq -r '.name // empty')"
+            cwd="$(printf '%s' "$payload" | jq -r '.cwd // empty')"
+
+            [ -n "$name" ] || wt_die "WorktreeCreate payload carried no name"
+
+            WT_ROOT="$(wt_find_root "${cwd:-$PWD}")" ||
+                wt_die "${cwd:-$PWD} is not inside a wt project"
+            WT_WORKTREES="$WT_ROOT/worktrees"
+
+            # .wt/config is project-supplied shell, so its output is sent to
+            # stderr rather than risking a stray line on the path Claude reads.
+            wt_load_config >&2
+
+            # Resolves a branch name or a directory name, so -w takes whichever
+            # you would have typed at `wt remove`, including a directory that
+            # was named with --as.
+            dir="$(wt_resolve_dir "$name")"
+            path="$WT_WORKTREES/$dir"
+
+            [ -d "$path" ] ||
+                wt_die "no worktree $dir in this project — make it first: wt add $name"
+
+            printf '%s\n' "$path"
+            ;;
+
+        WorktreeRemove)
+            :
+            ;;
+
+        "") wt_die "wt hook payload had no hook_event_name" ;;
+        *)  wt_die "wt hook does not handle $event" ;;
+    esac
+}
+
 # ------------------------------------------------------------------ main ----
 
 wt_usage() {
@@ -563,9 +677,13 @@ usage: wt <command>
                                dir defaults to the repository name, and is what
                                .wt/config derives the worktree suffix from
   add <name> [--base <ref>]    fetch origin, create worktrees/<name>, run .wt/hooks/add
+      [--as <dir-name>]        name the directory something other than the branch,
+                               for a branch too long to serve under its own name
   remove <name>... [--force]   run .wt/hooks/remove, then destroy each worktree
                                nothing is removed unless every name checks out
   list                         list this project's worktrees
+  hook                         answer Claude Code's worktree hooks on stdin, so
+                               `claude -w <name>` opens the worktree wt already made
 
 Run from anywhere inside a wt project; the root is found by walking up.
 USAGE
@@ -577,5 +695,6 @@ case "${1:-}" in
     add)    shift; wt_cmd_add "$@" ;;
     remove) shift; wt_cmd_remove "$@" ;;
     list)   shift; wt_cmd_list "$@" ;;
+    hook)   shift; wt_cmd_hook "$@" ;;
     *)      wt_usage ;;
 esac
