@@ -40,8 +40,10 @@ window-padding-balance = true
 window-save-state = always
 
 cursor-style = underline
+cursor-style-blink = false
+adjust-cursor-thickness = 2
 confirm-close-surface = false
-shell-integration-features = sudo
+shell-integration-features = sudo,no-cursor
 keybind = shift+enter=text:\x1b\r
 
 # Custom
