@@ -88,6 +88,121 @@ wt_set_env() {
     fi
 }
 
+# ------------------------------------------------------------------ herd ----
+
+# Herd is already the reason two other things here exist: WT_SUFFIX, because Herd
+# serves a parked directory at <dirname>.<tld> and two projects with a `main`
+# worktree would otherwise claim one hostname, and WT_MAX_DIR, because the
+# certificate for that hostname is what a too-long name cannot be issued. wt was
+# refusing names it could not secure while leaving the securing itself to be
+# spelled out again in every project's hooks. It belongs on this side of the line.
+#
+# What stays in the hooks is whether to ask for any of it. wt creates a worktree
+# and runs the hook; a project that is not a web application never calls these and
+# is never volunteered a certificate it has no use for.
+
+# Herd ships its CLI outside PATH, so a shell that never sourced Herd's exports —
+# which is every hook, since they run as bare subprocesses — still has to find it.
+wt_herd() {
+    if command -v herd 2>/dev/null; then
+        return 0
+    elif [ -x "$HOME/Library/Application Support/Herd/bin/herd" ]; then
+        printf '%s' "$HOME/Library/Application Support/Herd/bin/herd"
+    else
+        return 1
+    fi
+}
+
+# Herd owns the TLD; ask it rather than assuming .test.
+wt_herd_tld() {
+    local herd tld=""
+
+    herd="$(wt_herd)" && tld="$("$herd" tld 2>/dev/null | tr -d '[:space:]')"
+
+    printf '%s' "${tld:-test}"
+}
+
+# A parked directory is served under exactly its own name, which is what makes
+# WT_DIR the site name and not merely the directory's.
+wt_herd_host() { printf '%s.%s' "$WT_DIR" "$(wt_herd_tld)"; }
+
+# Nothing resolves at all unless the directory holding the worktrees is parked.
+#
+# `herd paths` prints a JSON array, one quoted entry per line, sometimes
+# trailing-slashed. Strip the indentation, quote and comma by anchoring to them
+# rather than deleting every space, since Herd's own default path ("Application
+# Support") proves a parked path may well contain one.
+wt_herd_parked() {
+    local herd
+
+    herd="$(wt_herd)" || return 1
+
+    "$herd" paths 2>/dev/null |
+        sed 's/^[[:space:]]*"//; s/",\{0,1\}$//; s:/*$::' |
+        grep -qxF "$WT_WORKTREES"
+}
+
+# Issue this worktree's certificate. Returns nonzero when that did not happen and
+# says why, because the reasons are the same for every project and the caller's
+# only remaining decision is the scheme it writes into a config file:
+#
+#     scheme=http
+#     wt_herd_secure && scheme=https
+#
+# Quiet on success: the hook is about to name the URL it just made work, and this
+# saying so first would only get in the way.
+wt_herd_secure() {
+    local herd
+
+    if ! herd="$(wt_herd)"; then
+        wt_warn "herd CLI not found; $(wt_herd_host) will not be served"
+        return 1
+    fi
+
+    if ! wt_herd_parked; then
+        wt_warn "$WT_WORKTREES is not parked, so $(wt_herd_host) will not resolve"
+        wt_warn "run: herd park $WT_WORKTREES"
+        return 1
+    fi
+
+    ( cd "$WT_PATH" && "$herd" secure >/dev/null ) || {
+        wt_warn "herd secure failed; $(wt_herd_host) will be served over http"
+        return 1
+    }
+}
+
+# Drop it again, on the way to destroying the worktree. Unlike securing, this
+# reports its own success: a remove hook with nothing else to do would otherwise
+# say nothing at all, and "there was no certificate" and "the certificate is gone"
+# are worth telling apart.
+#
+# The lookup is what tells them apart. It also keeps `herd unsecure` from being
+# run against a site that never had a certificate, which is the ordinary case for
+# any project that does not call wt_herd_secure.
+wt_herd_unsecure() {
+    local herd host
+    host="$(wt_herd_host)"
+
+    if ! herd="$(wt_herd)"; then
+        wt_warn "herd CLI not found; the certificate for $host was left behind"
+        return 1
+    fi
+
+    # The listing is a padded table, so the spaces around the host are what keep
+    # a site from matching another that merely ends with its name.
+    "$herd" secured 2>/dev/null | grep -qF " $host " || {
+        wt_info "$host has no certificate to drop"
+        return 0
+    }
+
+    ( cd "$WT_PATH" && "$herd" unsecure >/dev/null ) || {
+        wt_warn "herd unsecure failed; the certificate for $host was left behind"
+        return 1
+    }
+
+    wt_info "dropped the certificate for $host"
+}
+
 # The project root is the nearest ancestor that looks like one, so add and remove
 # work from anywhere inside the project — the root, a worktree, or deep inside one.
 #
@@ -155,9 +270,9 @@ wt_dir_for() { printf '%s%s' "$(wt_slugify "$1")" "$WT_SUFFIX"; }
 # and a site configured to use one that does not exist can take the whole web
 # server down with it — for every project on the machine, not just this one.
 #
-# wt does not know what TLD anything is served at, so the budget is the project's
-# to set: WT_MAX_DIR in .wt/config, already the file that defines the suffix
-# eating into it. Unset means the project does not care.
+# wt can ask Herd for its TLD, but not whether this project is served at all, so
+# the budget is the project's to set: WT_MAX_DIR in .wt/config, already the file
+# that defines the suffix eating into it. Unset means the project does not care.
 #
 # Checked before the worktree is created, because the failure it prevents surfaces
 # nowhere near here and reads as the web server being broken.
@@ -265,6 +380,8 @@ wt_run_hook() {
     [ -x "$hook" ] || return 0
 
     export -f wt_info wt_warn wt_die wt_slugify wt_worktrees wt_get_env wt_set_env
+    export -f wt_herd wt_herd_tld wt_herd_host wt_herd_parked
+    export -f wt_herd_secure wt_herd_unsecure
     export WT_ROOT WT_WORKTREES WT_SUFFIX WT_NAME WT_DIR WT_PATH WT_BRANCH
 
     wt_info "running .wt/hooks/$1"
@@ -425,6 +542,17 @@ wt_scaffold_hooks() {
 #   wt_worktrees    emits "<path>\\t<branch>" per worktree, sorted by path
 #   wt_get_env FILE KEY        reads a KEY=VALUE file; the first assignment wins
 #   wt_set_env FILE KEY VALUE  replaces the key, or appends it if it is absent
+#
+# Herd, for a project it serves. All of these are about this worktree and take no
+# arguments. Nothing calls them for you — a project Herd does not serve just
+# leaves them alone:
+#   wt_herd_host      the hostname this worktree is served at
+#   wt_herd_secure    issue its certificate; nonzero, with the reason, if it could
+#                     not — so \`scheme=http; wt_herd_secure && scheme=https\`
+#   wt_herd_unsecure  drop it again, for a remove hook
+#   wt_herd           the Herd CLI, wherever it lives
+#   wt_herd_tld       the TLD Herd serves at
+#   wt_herd_parked    whether \$WT_WORKTREES is parked, which nothing works without
 #
 # The working directory is \$WT_ROOT, not the worktree — so that a hook writing a
 # root-level file (a process manifest, a registry) and a hook working inside the
