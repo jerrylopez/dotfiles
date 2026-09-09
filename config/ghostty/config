@@ -63,6 +63,10 @@ keybind = cmd+shift+l=goto_split:right
 quick-terminal-position = top
 quick-terminal-size = 100%
 
+# Shorter than the 0.2 default. The slide is there to show where the terminal
+# came from, not to be watched.
+quick-terminal-animation-duration = 0.15
+
 # A chord rather than the double-tapped modifier iTerm uses, which Ghostty has no
 # equivalent for. ⌥space is free here: Raycast holds ⌘space, and both input-source
 # shortcuts that want space are disabled.
