@@ -50,7 +50,7 @@ keybind = shift+enter=text:\x1b\r
 split-divider-color = #2C313A
 
 macos-titlebar-proxy-icon = hidden
-font-size = 18
+font-size = 16
 window-padding-y = 8,0
 window-padding-x = 8,8
 macos-option-as-alt = true
