@@ -1,0 +1,29 @@
+title = "  "
+theme = dark:One Half Dark
+palette = 6=#7aa2f7
+palette = 14=#7aa2f7
+
+font-family = FiraCode
+font-style = Medium
+font-style-italic = Medium Italic
+font-style-bold = Medium
+font-style-bold-italic = Medium Italic
+window-padding-balance = true
+
+window-save-state = always
+
+cursor-style = underline
+confirm-close-surface = false
+shell-integration-features = sudo
+keybind = shift+enter=text:\x1b\r
+
+# Custom
+split-divider-color = #2C313A
+
+macos-titlebar-proxy-icon = hidden
+font-size = 18
+window-padding-y = 8,0
+window-padding-x = 8,8
+macos-option-as-alt = true
+keybind = cmd+shift+h=goto_split:left
+keybind = cmd+shift+l=goto_split:right
