@@ -34,6 +34,60 @@ wt_die()  { printf '\033[0;31merror\033[0m %s\n' "$*" >&2; exit 1; }
 # slash has to be flattened before it can name a directory.
 wt_slugify() { printf '%s' "$1" | tr '/' '-' | tr '[:upper:]' '[:lower:]'; }
 
+# ------------------------------------------------------------- env files ----
+
+# wt has no use for these itself, but every hook that provisions a worktree ends
+# up reading and writing a KEY=VALUE file, and each project was keeping its own
+# identical copy. Which keys matter is the project's business; the file format is
+# not, so the format lives here and the keys stay in the hook.
+#
+# Both functions treat a key as significant only at the very start of a line. A
+# commented `# KEY=` is therefore inert to both — which is what makes it safe to
+# set a key that the project's .env.example ships commented out.
+
+# The first assignment wins, because that is what the reader on the other end
+# does: Laravel builds its env repository immutable, so a key repeated in a .env
+# keeps the value it had the first time.
+wt_get_env() {
+    local file=$1 key=$2 value
+
+    [ -f "$file" ] || return 0
+
+    value="$(sed -n "s/^${key}=//p" "$file" | head -1)"
+
+    # Strip surrounding quotes, but only a matched pair. A value may legitimately
+    # contain a quote of its own — an apostrophe in a password, a nested "${VAR}"
+    # — and deleting every quote character would corrupt it.
+    case "$value" in
+        '"'*'"') value="${value#\"}" ; value="${value%\"}" ;;
+        "'"*"'") value="${value#\'}" ; value="${value%\'}" ;;
+    esac
+
+    printf '%s' "$value"
+}
+
+wt_set_env() {
+    local file=$1 key=$2 value=$3
+
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        # awk rather than sed, because the value is data: a slash or an & in it
+        # would otherwise be read as part of the replacement.
+        awk -v k="$key" -v v="$value" '
+            BEGIN { FS = "=" }
+            $1 == k { print k "=" v; next }
+            { print }
+        ' "$file" >"${file}.tmp" && mv "${file}.tmp" "$file"
+    else
+        # A file whose last line has no trailing newline would otherwise take the
+        # new key onto the end of that line rather than onto one of its own.
+        if [ -s "$file" ] && [ -n "$(tail -c 1 "$file")" ]; then
+            printf '\n' >>"$file"
+        fi
+
+        printf '%s=%s\n' "$key" "$value" >>"$file"
+    fi
+}
+
 # The project root is the nearest ancestor that looks like one, so add and remove
 # work from anywhere inside the project — the root, a worktree, or deep inside one.
 #
@@ -210,7 +264,7 @@ wt_run_hook() {
 
     [ -x "$hook" ] || return 0
 
-    export -f wt_info wt_warn wt_die wt_slugify wt_worktrees
+    export -f wt_info wt_warn wt_die wt_slugify wt_worktrees wt_get_env wt_set_env
     export WT_ROOT WT_WORKTREES WT_SUFFIX WT_NAME WT_DIR WT_PATH WT_BRANCH
 
     wt_info "running .wt/hooks/$1"
@@ -369,6 +423,8 @@ wt_scaffold_hooks() {
 # Exported functions, available to bash hooks only:
 #   wt_info MSG     wt_warn MSG     wt_die MSG     wt_slugify STR
 #   wt_worktrees    emits "<path>\\t<branch>" per worktree, sorted by path
+#   wt_get_env FILE KEY        reads a KEY=VALUE file; the first assignment wins
+#   wt_set_env FILE KEY VALUE  replaces the key, or appends it if it is absent
 #
 # The working directory is \$WT_ROOT, not the worktree — so that a hook writing a
 # root-level file (a process manifest, a registry) and a hook working inside the
