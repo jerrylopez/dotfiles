@@ -39,10 +39,12 @@ window-padding-balance = true
 
 window-save-state = always
 
-# Start with no window, so launching Ghostty leaves ⌥space as the way in. Saved
-# state still comes back: this governs the window Ghostty would have made itself,
-# not the ones it is restoring.
-initial-window = false
+# Left on, though starting without a window would suit a quick-terminal-only
+# setup, because false makes Ghostty ignore quick-terminal-size and open the
+# quick terminal at a fraction of the size asked for — which a TUI cannot
+# survive. Broken since the option shipped in 1.2.0, still open upstream:
+# https://github.com/ghostty-org/ghostty/issues/10658
+initial-window = true
 
 cursor-style = underline
 cursor-style-blink = false
