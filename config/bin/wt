@@ -350,6 +350,37 @@ wt_fetch() {
     fi
 }
 
+# A bare repo fetches only into refs/remotes/origin/*, so a local branch the clone
+# was created with — main, above all — is never advanced by anything here and never
+# gains an upstream: `git clone --bare` writes the ref and no branch.<name>.* config
+# to go with it. Checking that branch out as-is hands you a worktree quietly behind
+# origin that cannot even `git pull` to find out. So before checking out a branch
+# that already exists locally, adopt origin's copy of it: move the branch up to the
+# remote when it has only fallen behind, and give it the upstream it should have had
+# from the start.
+#
+# Only ever a fast-forward. A branch carrying local commits is left exactly where it
+# is — the point is to repair the ones nobody has touched, not to move work.
+wt_adopt_origin() {
+    local name="$1" remote="refs/remotes/origin/$1"
+
+    wt_git show-ref --verify --quiet "$remote" || return 0
+
+    if wt_git merge-base --is-ancestor "refs/heads/$name" "$remote" &&
+        ! wt_git merge-base --is-ancestor "$remote" "refs/heads/$name"; then
+        if wt_git branch --force "$name" "origin/$name" 2>/dev/null; then
+            wt_info "fast-forwarded $name to origin/$name"
+        else
+            wt_warn "$name is behind origin/$name but is checked out elsewhere"
+        fi
+    fi
+
+    if [ -z "$(wt_git config --get "branch.$name.merge" || true)" ]; then
+        wt_git branch --set-upstream-to="origin/$name" "$name" >/dev/null
+        wt_info "set upstream of $name to origin/$name"
+    fi
+}
+
 # Emit "<path>\t<branch>" per worktree, sorted by path, skipping the bare repo.
 #
 # Exported to hooks because the questions a worktree cannot answer alone are all
@@ -624,13 +655,19 @@ wt_cmd_add() {
 
     if wt_git show-ref --verify --quiet "refs/heads/$name"; then
         wt_info "checking out existing branch $name"
+        wt_adopt_origin "$name"
         wt_git worktree add "$WT_PATH" "$name"
     elif wt_git show-ref --verify --quiet "refs/remotes/origin/$name"; then
         wt_info "tracking origin/$name"
         wt_git worktree add --track -b "$name" "$WT_PATH" "origin/$name"
     else
+        # --no-track because the base is usually origin/main, and letting git infer an
+        # upstream from it would point a brand new branch at main: `git pull` would
+        # merge main into the work, and `git push` would refuse outright, the upstream
+        # naming a branch other than this one. The first `git push -u` sets the real
+        # one. A branch that does exist on origin took the arm above and does track it.
         wt_info "creating branch $name from $base"
-        wt_git worktree add -b "$name" "$WT_PATH" "$base"
+        wt_git worktree add --no-track -b "$name" "$WT_PATH" "$base"
     fi
 
     # The `if` is what keeps errexit from aborting here: a failing hook has to be
