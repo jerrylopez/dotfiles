@@ -74,7 +74,7 @@ quick-terminal-size = 100%
 # came from, not to be watched.
 quick-terminal-animation-duration = 0.15
 
-# A chord rather than the double-tapped modifier iTerm uses, which Ghostty has no
-# equivalent for. ⌥space is free here: Raycast holds ⌘space, and both input-source
-# shortcuts that want space are disabled.
-keybind = global:opt+space=toggle_quick_terminal
+# Hyper+space. Raycast makes right command a hyper key with the shift included,
+# so what actually reaches Ghostty is all four modifiers at once — there is no
+# hyper of its own to bind, only the chord it stands for.
+keybind = global:ctrl+alt+shift+cmd+space=toggle_quick_terminal
