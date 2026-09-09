@@ -56,3 +56,14 @@ window-padding-x = 8,8
 macos-option-as-alt = true
 keybind = cmd+shift+h=goto_split:left
 keybind = cmd+shift+l=goto_split:right
+
+# Quick terminal, standing in for the iTerm hotkey window. 100% is the primary
+# axis — height, for a terminal positioned at the top — and the secondary axis is
+# maximized on its own, so this covers the screen.
+quick-terminal-position = top
+quick-terminal-size = 100%
+
+# A chord rather than the double-tapped modifier iTerm uses, which Ghostty has no
+# equivalent for. ⌥space is free here: Raycast holds ⌘space, and both input-source
+# shortcuts that want space are disabled.
+keybind = global:opt+space=toggle_quick_terminal
