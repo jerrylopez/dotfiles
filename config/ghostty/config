@@ -1,8 +1,7 @@
 title = "  "
 
-# Colors, taken from the Hotkey Window profile in config/iterm/preferences, so a
-# Ghostty window and an iTerm one look the same. Set out in full rather than as a
-# theme, because no Ghostty theme carries them.
+# Colors carried over from the iTerm hotkey window this replaced. Set out in full
+# rather than as a theme, because no Ghostty theme carries them.
 background = #1d1f28
 foreground = #fdfdfd
 cursor-color = #c574dd
@@ -10,7 +9,7 @@ cursor-text = #ffffff
 selection-background = #c1deff
 selection-foreground = #000000
 
-# iTerm has Use Bright Bold on, with this as the bold color.
+# iTerm rendered bold in white rather than a brighter shade of the text colour.
 bold-color = #ffffff
 
 palette = 0=#282a36
