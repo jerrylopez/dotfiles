@@ -39,6 +39,11 @@ window-padding-balance = true
 
 window-save-state = always
 
+# Start with no window, so launching Ghostty leaves ⌥space as the way in. Saved
+# state still comes back: this governs the window Ghostty would have made itself,
+# not the ones it is restoring.
+initial-window = false
+
 cursor-style = underline
 cursor-style-blink = false
 adjust-cursor-thickness = 2
