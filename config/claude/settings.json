@@ -83,5 +83,5 @@
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-daltonized",
-  "hooks": {"SessionStart":[{"matcher":"*","hooks":[{"type":"command","command":"bash '/Users/jerrylopez/.claude/hooks/herdr-agent-state.sh' session","timeout":10}]}]}
+  "hooks": {"SessionStart":[{"matcher":"*","hooks":[{"type":"command","command":"bash \"$HOME/.claude/hooks/herdr-agent-state.sh\" session","timeout":10}]}]}
 }
