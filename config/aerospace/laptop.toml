@@ -25,6 +25,10 @@ ctrl-alt-shift-cmd-2 = 'workspace 2'   # Arc
 ctrl-alt-shift-cmd-3 = 'workspace 3'   # comms
 ctrl-alt-shift-cmd-tab = 'workspace-back-and-forth'
 
+# Move focus between windows in the current workspace.
+ctrl-alt-shift-cmd-leftSquareBracket = 'focus left'
+ctrl-alt-shift-cmd-rightSquareBracket = 'focus right'
+
 # Toggle between the laptop and external-monitor configs. Keep this binding
 # in every config — without it there is no way back.
 ctrl-alt-shift-cmd-backtick = 'exec-and-forget /bin/bash -c "$HOME/.dotfiles/config/aerospace/switch-config.sh"'
