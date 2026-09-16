@@ -38,13 +38,6 @@ window-padding-balance = true
 
 window-save-state = always
 
-# Left on, though starting without a window would suit a quick-terminal-only
-# setup, because false makes Ghostty ignore quick-terminal-size and open the
-# quick terminal at a fraction of the size asked for — which a TUI cannot
-# survive. Broken since the option shipped in 1.2.0, still open upstream:
-# https://github.com/ghostty-org/ghostty/issues/10658
-initial-window = true
-
 cursor-style = underline
 cursor-style-blink = false
 adjust-cursor-thickness = 2
@@ -59,21 +52,5 @@ macos-titlebar-proxy-icon = hidden
 font-size = 16
 window-padding-y = 8,0
 window-padding-x = 8,8
-macos-option-as-alt = true
 keybind = cmd+shift+h=goto_split:left
 keybind = cmd+shift+l=goto_split:right
-
-# Quick terminal, standing in for the iTerm hotkey window. 100% is the primary
-# axis — height, for a terminal positioned at the top — and the secondary axis is
-# maximized on its own, so this covers the screen.
-quick-terminal-position = top
-quick-terminal-size = 100%
-
-# Shorter than the 0.2 default. The slide is there to show where the terminal
-# came from, not to be watched.
-quick-terminal-animation-duration = 0.15
-
-# Hyper+space. Raycast makes right command a hyper key with the shift included,
-# so what actually reaches Ghostty is all four modifiers at once — there is no
-# hyper of its own to bind, only the chord it stands for.
-keybind = global:ctrl+alt+shift+cmd+space=toggle_quick_terminal
