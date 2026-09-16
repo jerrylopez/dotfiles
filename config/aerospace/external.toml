@@ -19,7 +19,21 @@ outer.bottom = 10
 ctrl-alt-shift-cmd-1 = 'workspace 1'   # Ghostty
 ctrl-alt-shift-cmd-2 = 'workspace 2'   # Arc
 ctrl-alt-shift-cmd-3 = 'workspace 3'   # comms
+ctrl-alt-shift-cmd-4 = 'workspace 4'   # Linear + Things
 ctrl-alt-shift-cmd-tab = 'workspace-back-and-forth'
+
+# Group the focused window with its neighbour into a container. Nested
+# containers take the opposite orientation, so joining two windows in a
+# side-by-side workspace stacks them and leaves the others untouched.
+ctrl-alt-shift-cmd-w = 'join-with up'
+ctrl-alt-shift-cmd-a = 'join-with left'
+ctrl-alt-shift-cmd-s = 'join-with down'
+ctrl-alt-shift-cmd-d = 'join-with right'
+
+# Reset the whole workspace to a flat layout. Flatten first, otherwise
+# 'layout' would only reorient the container the focused window sits in.
+ctrl-alt-shift-cmd-h = ['flatten-workspace-tree', 'layout h_tiles']
+ctrl-alt-shift-cmd-v = ['flatten-workspace-tree', 'layout v_tiles']
 
 # Move focus between windows in the current workspace.
 ctrl-alt-shift-cmd-leftSquareBracket = 'focus left'
@@ -47,3 +61,12 @@ run = ['move-node-to-workspace 3', 'layout h_tiles']
 [[on-window-detected]]
 if.app-id = 'com.mimestream.Mimestream'
 run = ['move-node-to-workspace 3', 'layout h_tiles']
+
+# Linear and Things, tiled side by side.
+[[on-window-detected]]
+if.app-id = 'com.linear'
+run = ['move-node-to-workspace 4', 'layout h_tiles']
+
+[[on-window-detected]]
+if.app-id = 'com.culturedcode.ThingsMac'
+run = ['move-node-to-workspace 4', 'layout h_tiles']
