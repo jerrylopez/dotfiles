@@ -1,0 +1,45 @@
+# AeroSpace — https://nikitabobko.github.io/AeroSpace/guide
+# Defaults for anything not set here: /Applications/AeroSpace.app/Contents/Resources/default-config.toml
+
+config-version = 2
+start-at-login = true
+auto-reload-config = true
+
+[gaps]
+inner.horizontal = 10
+inner.vertical = 10
+outer.left = 10
+outer.right = 10
+outer.top = 10
+outer.bottom = 10
+
+[mode.main.binding]
+# Hyperkey sends ctrl+alt+shift+cmd together; AeroSpace has no 'hyper'
+# modifier, so the chord it stands for is what gets bound.
+ctrl-alt-shift-cmd-1 = 'workspace 1'   # Ghostty
+ctrl-alt-shift-cmd-2 = 'workspace 2'   # Arc
+ctrl-alt-shift-cmd-3 = 'workspace 3'   # comms
+ctrl-alt-shift-cmd-tab = 'workspace-back-and-forth'
+
+# Toggle between the laptop and external-monitor configs. Keep this binding
+# in every config — without it there is no way back.
+ctrl-alt-shift-cmd-backtick = 'exec-and-forget /bin/bash -c "$HOME/.dotfiles/config/aerospace/switch-config.sh"'
+
+# Send apps to their workspace automatically. Anything without a rule below
+# opens on whatever workspace is focused at the time.
+[[on-window-detected]]
+if.app-id = 'com.mitchellh.ghostty'
+run = 'move-node-to-workspace 1'
+
+[[on-window-detected]]
+if.app-id = 'company.thebrowser.Browser'
+run = 'move-node-to-workspace 2'
+
+# Comms. Tiled side by side — the external display is wide enough for both.
+[[on-window-detected]]
+if.app-id = 'com.tinyspeck.slackmacgap'
+run = ['move-node-to-workspace 3', 'layout h_tiles']
+
+[[on-window-detected]]
+if.app-id = 'com.mimestream.Mimestream'
+run = ['move-node-to-workspace 3', 'layout h_tiles']
