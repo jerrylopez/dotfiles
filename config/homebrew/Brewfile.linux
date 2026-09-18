@@ -19,14 +19,19 @@ brew 'jp2a'
 brew 'jq'
 brew 'libgit2'
 brew 'openssl'
+# $EDITOR on this box, from brew because Ubuntu does not package a current
+# Neovim. The rest is what LazyVim leans on: ripgrep and fd back its pickers,
+# and lazygit is what <leader>gg opens.
+brew 'neovim'
+brew 'ripgrep'
+brew 'fd'
+brew 'lazygit'
 brew 'node'
 brew 'nodenv'
 brew 'readline'
 brew 'pv'
 brew 'roundup'
 brew 'spaceman-diff'
-# $EDITOR on this box. Ubuntu does not package a current Neovim.
-brew 'neovim'
 brew 'wget'
 brew 'zsh'
 brew 'zsh-completions'

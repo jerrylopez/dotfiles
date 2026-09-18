@@ -12,6 +12,12 @@
     ~/.gitignore: config/git/gitignore
     ~/.zshrc: config/zsh/zshrc
     ~/.composer/composer.json: config/composer/composer.json
+    # Neovim reads ~/.config/nvim on macOS and Linux alike, so this is shared.
+    # Linking the whole directory means the lockfile nvim rewrites on a plugin
+    # update lands in this repo as a reviewable change.
+    ~/.config/nvim:
+      path: config/nvim
+      create: true
     ~/.claude/settings.json: config/claude/settings.json
     ~/.claude/skills: config/agents/skills
     ~/.agents/skills: config/agents/skills
