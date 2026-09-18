@@ -5,7 +5,6 @@
 # GNU tools but Linux already ships as its system default.
 
 tap 'jondot/tap'
-tap 'homebrew/bundle'
 
 brew 'ack'
 brew 'gcc'
