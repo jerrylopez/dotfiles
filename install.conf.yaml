@@ -20,8 +20,14 @@
       create: true
     ~/.claude/settings.json: config/claude/settings.json
     ~/.claude/skills: config/agents/skills
-    ~/.agents/skills: config/agents/skills
-    ~/.agents/.skill-lock.json: config/agents/.skill-lock.json
+    # ~/.agents does not exist on a fresh machine the way ~/.claude does, so
+    # these two ask dotbot to make the parent directory first.
+    ~/.agents/skills:
+      path: config/agents/skills
+      create: true
+    ~/.agents/.skill-lock.json:
+      path: config/agents/.skill-lock.json
+      create: true
 
 - shell:
     - [git submodule update --init --recursive]
