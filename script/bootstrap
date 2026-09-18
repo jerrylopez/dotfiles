@@ -16,3 +16,5 @@ brew bundle --file="${BASEDIR}/config/homebrew/Brewfile"
 "${BASEDIR}/script/install"
 
 "${BASEDIR}/script/defaults"
+
+"${BASEDIR}/script/dns"
