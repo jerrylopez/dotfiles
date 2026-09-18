@@ -1,7 +1,7 @@
 # Run after install.conf.yaml, by script/install.
 #
 # VS Code keeps its settings under ~/Library on macOS and in ~/.config
-# elsewhere, and Aerospace, Ghostty and Herd have no place on a headless box.
+# elsewhere, and Aerospace, Ghostty and herdr have no place on a headless box.
 
 - defaults:
     link:

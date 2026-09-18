@@ -12,7 +12,7 @@ brew upgrade
 brew bundle --file="${BASEDIR}/config/homebrew/Brewfile.${PLATFORM}"
 brew cleanup
 
-# Composer is installed by Herd on the Mac and may simply not be present on a
+# Composer is a Mac-only formula here and may simply not be present on a
 # headless box, so this is the one step that is allowed to be missing.
 if command -v composer >/dev/null 2>&1; then
     composer global update
