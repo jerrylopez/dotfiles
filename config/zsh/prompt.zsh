@@ -9,7 +9,7 @@ autoload colors && colors
 # expand both halves to plain text, measure them, and fill the gap between. A
 # terminal too narrow to hold both drops the hostname rather than wrapping it.
 directory_name() {
-  local dir_fmt='%1/%/' host_fmt='%m' dir host pad
+  local dir_fmt='%1/' host_fmt='%m' dir host pad
 
   # Doubled so that a `%` in a path is not taken for a prompt escape when zsh
   # expands this line.
