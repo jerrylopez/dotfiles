@@ -68,18 +68,6 @@ fi
 # | Make sure nothing else owns port 53
 # |----------------------------------------------------------------
 
-# Warden runs its own dnsmasq container locally, which also wants :53 and
-# answers *.test with 127.0.0.1 -- wrong for us, since the sites live on the
-# VPS. If it's up, take it down.
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    if docker ps --format '{{.Names}}' | grep -q 'dnsmasq'; then
-        warn "A local Warden dnsmasq container is running and would fight for port 53."
-        warn "Stopping Warden's local services: warden svc down"
-        warden svc down
-        warn "Warden's local services are now DOWN. Bring them back with 'warden svc up' if you need them."
-    fi
-fi
-
 info "Checking what's listening on port 53"
 sudo -v
 PORT_53_HOLDERS="$(
