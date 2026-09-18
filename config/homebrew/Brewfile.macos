@@ -21,6 +21,10 @@ brew 'ripgrep'
 brew 'fd'
 brew 'lazygit'
 brew 'openssl'
+# PHP came from Homebrew rather than Herd even while Herd was installed, so
+# uninstalling it changed nothing here except that this is now the only source.
+brew 'php'
+brew 'composer'
 brew 'node'
 brew 'nodenv'
 brew 'readline'
