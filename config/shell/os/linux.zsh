@@ -21,4 +21,4 @@ fi
 export PROJECTS=$HOME/Code
 
 # This box is headless, so the Mac's `code` is not an option here.
-export EDITOR='vim'
+export EDITOR='nvim'

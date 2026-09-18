@@ -25,8 +25,8 @@ brew 'readline'
 brew 'pv'
 brew 'roundup'
 brew 'spaceman-diff'
-# $EDITOR on this box. Ubuntu server often ships only vim-tiny.
-brew 'vim'
+# $EDITOR on this box. Ubuntu does not package a current Neovim.
+brew 'neovim'
 brew 'wget'
 brew 'zsh'
 brew 'zsh-completions'
