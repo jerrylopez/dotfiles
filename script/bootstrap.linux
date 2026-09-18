@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# The Linux half of the bootstrap. Ubuntu/Debian, headless.
+#
+# There is deliberately no counterpart to script/defaults (nothing with a GUI
+# to configure) and none to script/dns -- the wildcard *.test override exists
+# only so the Mac can reach the Warden VPS, and Warden runs on the VPS itself.
+
+set -e
+
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+
+if ! command -v brew >/dev/null 2>&1 && [ ! -x "${HOMEBREW_PREFIX}/bin/brew" ]; then
+    # Homebrew on Linux builds far more from source than it does on macOS, so
+    # it will not install at all without a compiler and these basics present.
+    sudo apt-get update
+    sudo apt-get install -y build-essential curl file git procps
+
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Either the installer just ran and left PATH untouched, or brew was already
+# there from a previous run but this non-login shell never sourced shellenv.
+if ! command -v brew >/dev/null 2>&1; then
+    eval "$("${HOMEBREW_PREFIX}/bin/brew" shellenv)"
+fi
+
+brew bundle --file="${BASEDIR}/config/homebrew/Brewfile.linux"

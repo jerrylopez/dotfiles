@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
+#
+# Sets this machine up from scratch.
+#
+# Everything that differs between macOS and Linux lives in
+# script/bootstrap.<platform>; this file only decides which one to run and
+# then lays down the symlinks, which are shared.
 
 set -e
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLATFORM="$("${BASEDIR}/script/lib/platform")"
 
 cd "${BASEDIR}"
 
-if test ! $(which brew)
-then
-    ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-fi
-
-brew bundle --file="${BASEDIR}/config/homebrew/Brewfile"
+"${BASEDIR}/script/bootstrap.${PLATFORM}"
 
 "${BASEDIR}/script/install"
-
-"${BASEDIR}/script/defaults"
-
-"${BASEDIR}/script/dns"

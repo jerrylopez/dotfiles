@@ -1,5 +1,5 @@
 g() {
-    php /Volumes/CaseSensitive/Code/geoffrey/artisan "$@"
+    php "$PROJECTS/geoffrey/artisan" "$@"
 }
 
 c() {

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# Echoes the name this machine's OS-specific files are keyed by: "macos" or
+# "linux". That name is the suffix on script/bootstrap.*, config/homebrew/
+# Brewfile.*, install.*.conf.yaml, and the files in config/shell/os.
+#
+# An unrecognised OS is a hard failure rather than a default, because guessing
+# wrong here means running the wrong bootstrap against the machine.
+
+set -euo pipefail
+
+case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux)  echo linux ;;
+    *)
+        printf 'Unsupported OS: %s\n' "$(uname -s)" >&2
+        exit 1
+        ;;
+esac

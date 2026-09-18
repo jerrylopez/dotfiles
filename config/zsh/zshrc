@@ -1,9 +1,6 @@
 # shortcut to this dotfiles path is $ZSH
 export ZSH=$HOME/.dotfiles
 
-# your project folder that we can `c [tab]` to
-export PROJECTS=/Volumes/CaseSensitive/Code
-
 # Path to dotfiles directory
 export DOTFILES=$HOME/.dotfiles
 
@@ -15,15 +12,34 @@ then
   source ~/.localrc
 fi
 
+# Which file in config/shell/os belongs to this machine. Read from $OSTYPE
+# rather than script/lib/platform so that opening a shell doesn't fork a
+# subprocess to learn something zsh already knows.
+case $OSTYPE in
+  darwin*) DOTFILES_OS=macos ;;
+  linux*)  DOTFILES_OS=linux ;;
+esac
+
 # all of our zsh files
 typeset -U config_files
 config_files=($ZSH/**/*.zsh)
+
+# The files under config/shell/os are per-machine and only one of them is ever
+# wanted, so keep them out of the bulk load and source the right one below.
+config_files=(${config_files:#*/shell/os/*})
 
 # load everything but the path and completion files
 for file in ${${config_files:#*/path.zsh}:#*/completions.zsh}
 do
   source $file
 done
+
+# After the shared files, so it can override what they set, and before
+# compinit, so anything it adds to fpath is in place when completion loads.
+if [[ -n $DOTFILES_OS && -f $ZSH/config/shell/os/$DOTFILES_OS.zsh ]]
+then
+  source $ZSH/config/shell/os/$DOTFILES_OS.zsh
+fi
 
 # initialize autocomplete here, otherwise functions won't be loaded
 autoload -U compinit
@@ -45,8 +61,3 @@ zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
 bindkey "^[[A" up-line-or-beginning-search # Up
 bindkey "^[[B" down-line-or-beginning-search # Down
-
-# opencode
-export PATH=/Users/jerrylopez/.opencode/bin:$PATH
-fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
-autoload -Uz compinit && compinit

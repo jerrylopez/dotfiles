@@ -1,0 +1,32 @@
+# Linux, headless.
+#
+# No casks: there is no GUI on this box. No dnsmasq either -- that is Mac-only,
+# for pointing *.test at the VPS. And no coreutils, which the Mac needs to get
+# GNU tools but Linux already ships as its system default.
+
+tap 'jondot/tap'
+tap 'homebrew/bundle'
+
+brew 'ack'
+brew 'gcc'
+brew 'git'
+brew 'grc'
+brew 'gh'
+# imagemagick and jp2a are here for spaceman-diff, which renders image diffs
+# as ASCII; they travel together or not at all.
+brew 'imagemagick'
+brew 'jp2a'
+brew 'jq'
+brew 'libgit2'
+brew 'openssl'
+brew 'node'
+brew 'nodenv'
+brew 'readline'
+brew 'pv'
+brew 'roundup'
+brew 'spaceman-diff'
+# $EDITOR on this box. Ubuntu server often ships only vim-tiny.
+brew 'vim'
+brew 'wget'
+brew 'zsh'
+brew 'zsh-completions'

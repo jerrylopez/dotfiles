@@ -1,0 +1,10 @@
+# Run after install.conf.yaml, by script/install.
+#
+# Nothing to add yet: the box is headless, so every link that is not already
+# shared belongs to a GUI application that does not run on it. The file exists
+# so script/install can dispatch on platform without a special case.
+
+- defaults:
+    link:
+      relink: true
+      force: true

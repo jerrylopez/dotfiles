@@ -1,0 +1,21 @@
+# Run after install.conf.yaml, by script/install.
+#
+# VS Code keeps its settings under ~/Library on macOS and in ~/.config
+# elsewhere, and Aerospace, Ghostty and Herd have no place on a headless box.
+
+- defaults:
+    link:
+      relink: true
+      force: true
+
+- link:
+    ~/Library/Application Support/Code/User/settings.json: config/vscode/settings.json
+    ~/Library/Application Support/Code/User/keybindings.json: config/vscode/keybindings.json
+    ~/.config/ghostty/config:
+      path: config/ghostty/config
+      create: true
+    ~/.config/herdr/config.toml:
+      path: config/herdr/config.toml
+      create: true
+    # Default; hyper+` repoints this to external.toml at runtime.
+    ~/.aerospace.toml: config/aerospace/laptop.toml

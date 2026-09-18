@@ -3,12 +3,17 @@
 set -e
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PLATFORM="$("${BASEDIR}/script/lib/platform")"
 
 "${BASEDIR}/script/install"
 
 brew update
 brew upgrade
-brew bundle --file="${BASEDIR}/config/homebrew/Brewfile"
+brew bundle --file="${BASEDIR}/config/homebrew/Brewfile.${PLATFORM}"
 brew cleanup
 
-composer global update
+# Composer is installed by Herd on the Mac and may simply not be present on a
+# headless box, so this is the one step that is allowed to be missing.
+if command -v composer >/dev/null 2>&1; then
+    composer global update
+fi

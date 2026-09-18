@@ -5,26 +5,17 @@
 
 - clean: ["~", "~/.cache"]
 
+# The links every machine wants. Anything whose target path or whose
+# application is OS-specific belongs in install.<platform>.conf.yaml instead.
 - link:
     ~/.gitconfig: config/git/gitconfig
     ~/.gitignore: config/git/gitignore
     ~/.zshrc: config/zsh/zshrc
-    ~/Library/Application Support/Code/User/settings.json: config/vscode/settings.json
-    ~/Library/Application Support/Code/User/keybindings.json: config/vscode/keybindings.json
-    ~/.config/ghostty/config:
-      path: config/ghostty/config
-      create: true
-    ~/.config/herdr/config.toml:
-      path: config/herdr/config.toml
-      create: true
     ~/.composer/composer.json: config/composer/composer.json
     ~/.claude/settings.json: config/claude/settings.json
     ~/.claude/skills: config/agents/skills
     ~/.agents/skills: config/agents/skills
     ~/.agents/.skill-lock.json: config/agents/.skill-lock.json
-    # Default; hyper+` repoints this to external.toml at runtime.
-    ~/.aerospace.toml: config/aerospace/laptop.toml
-
 
 - shell:
     - [git submodule update --init --recursive]

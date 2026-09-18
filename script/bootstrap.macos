@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# The macOS half of the bootstrap: Homebrew, the Mac package list, the system
+# defaults, and the *.test DNS override that points this machine at the VPS.
+
+set -e
+
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+HOMEBREW_PREFIX="/opt/homebrew"
+
+if ! command -v brew >/dev/null 2>&1; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    # The installer does not touch the PATH of the shell that ran it, so
+    # without this the brew calls below would still not find it.
+    eval "$("${HOMEBREW_PREFIX}/bin/brew" shellenv)"
+fi
+
+brew bundle --file="${BASEDIR}/config/homebrew/Brewfile.macos"
+
+"${BASEDIR}/script/defaults"
+
+"${BASEDIR}/script/dns"
