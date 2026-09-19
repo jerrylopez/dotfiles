@@ -34,6 +34,10 @@ font-style = Medium
 font-style-italic = Medium Italic
 font-style-bold = Medium
 font-style-bold-italic = Medium Italic
+
+# Line height of 1.35. These adjustments are deltas rather than multipliers, so
+# the number is the 35% the cell grows by and not the height it ends up at.
+adjust-cell-height = 35%
 window-padding-balance = true
 
 window-save-state = always
