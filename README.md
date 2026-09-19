@@ -30,7 +30,6 @@ On Linux it also makes zsh the login shell, which takes effect at the next login
 | `script/install` | Symlinks only. Run this after adding a link to a Dotbot config. |
 | `script/update` | Updates Homebrew and Composer, re-bundles. Also aliased to `update`. |
 | `script/defaults` | macOS system preferences. Called by bootstrap. |
-| `script/dns` | Points `*.test` at the Warden VPS over Tailscale. macOS only. |
 | `script/lib/platform` | Echoes `macos` or `linux`. Everything else dispatches on this. |
 
 ## The platform split
@@ -56,14 +55,13 @@ before `compinit` so anything it adds to `fpath` is seen.
 ### What actually differs
 
 **macOS** is the workstation: GUI casks, Aerospace, Ghostty, VS Code settings
-under `~/Library`, system defaults, and the `*.test` DNS override.
+under `~/Library`, and system defaults.
 
 **Linux** is a headless Ubuntu/Debian box: no casks, no GUI config, `$EDITOR`
 is `nvim` rather than `code`, and Homebrew lives in `/home/linuxbrew`.
 
-Neither `script/defaults` nor `script/dns` has a Linux counterpart. There is no
-GUI there to configure, and the wildcard `*.test` override exists only so the
-Mac can reach the VPS that Warden runs on.
+`script/defaults` has no Linux counterpart — there is no GUI there to
+configure.
 
 ## Layout
 

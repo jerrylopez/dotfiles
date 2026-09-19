@@ -1,8 +1,7 @@
 # Linux, headless.
 #
-# No casks: there is no GUI on this box. No dnsmasq either -- that is Mac-only,
-# for pointing *.test at the VPS. And no coreutils, which the Mac needs to get
-# GNU tools but Linux already ships as its system default.
+# No casks: there is no GUI on this box. And no coreutils, which the Mac needs
+# to get GNU tools but Linux already ships as its system default.
 
 tap 'jondot/tap'
 

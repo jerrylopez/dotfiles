@@ -4,7 +4,6 @@ tap 'jondot/tap'
 
 brew 'ack'
 brew 'coreutils'
-brew 'dnsmasq'
 brew 'gcc'
 brew 'git'
 brew 'grc'

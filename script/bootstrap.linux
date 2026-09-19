@@ -2,9 +2,8 @@
 #
 # The Linux half of the bootstrap. Ubuntu/Debian, headless.
 #
-# There is deliberately no counterpart to script/defaults (nothing with a GUI
-# to configure) and none to script/dns -- the wildcard *.test override exists
-# only so the Mac can reach the Warden VPS, and Warden runs on the VPS itself.
+# There is deliberately no counterpart to script/defaults: nothing with a GUI
+# to configure.
 
 set -e
 

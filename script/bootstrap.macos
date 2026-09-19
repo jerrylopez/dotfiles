@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# The macOS half of the bootstrap: Homebrew, the Mac package list, the system
-# defaults, and the *.test DNS override that points this machine at the VPS.
+# The macOS half of the bootstrap: Homebrew, the Mac package list, and the
+# system defaults.
 
 set -e
 
@@ -20,5 +20,3 @@ fi
 brew bundle --file="${BASEDIR}/config/homebrew/Brewfile.macos"
 
 "${BASEDIR}/script/defaults"
-
-"${BASEDIR}/script/dns"
