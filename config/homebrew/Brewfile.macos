@@ -37,7 +37,9 @@ brew 'zsh-completions'
 
 cask '1password'
 cask 'fantastical'
-cask 'font-fira-code'
+# The patched build rather than the plain one, for the glyphs the zsh prompt
+# draws its badges out of. Same typeface, same metrics.
+cask 'font-fira-code-nerd-font'
 cask 'github'
 cask 'google-chrome'
 cask 'keepingyouawake'
