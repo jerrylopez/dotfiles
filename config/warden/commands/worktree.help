@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+[[ ! ${WARDEN_DIR} ]] && >&2 echo -e "\033[31mThis script is not intended to be run directly!\033[0m" && exit 1
+
+WARDEN_USAGE=$(cat <<EOF
+\033[33mUsage:\033[0m
+  warden worktree <branch> [--base <ref>]
+
+\033[33mDescription:\033[0m
+  Creates a git worktree for the current project and gives it a Warden
+  environment of its own, so several branches can run at once without
+  colliding on environment name, domain or container names.
+
+  Run it from anywhere inside a project. The worktree is placed at
+  \033[32m\$WORKTREES/<project>/<branch>\033[0m, the environment is named
+  \033[32m<project>-<branch>\033[0m, and the domain becomes
+  \033[32m<project>-<branch>.<base domain>\033[0m.
+
+  An existing branch is checked out as-is, a remote-only branch starts
+  tracking origin, and anything else is created — from --base when given,
+  otherwise from the current HEAD.
+
+  The parent's .env is copied in, since it is gitignored and Warden cannot
+  detect an environment without one. The name and domain are then set in
+  .env.local, which Warden loads after .env and lets override WARDEN_,
+  TRAEFIK_ and PHP_ values. Application-level settings such as APP_URL are
+  not touched.
+
+  The path is the only thing printed on stdout, so it can be captured:
+
+    herdr worktree open --path "\$(warden worktree feature-a)"
+
+\033[33mOptions:\033[0m
+  --base <ref>  Branch from this ref instead of the current HEAD. Only
+                applies when the branch does not already exist.
+
+\033[33mConfiguration:\033[0m
+  WARDEN_WORKTREE_DOMAIN  Base domain for worktree environments. Defaults to
+                          the parent's TRAEFIK_DOMAIN with its first label
+                          removed, so kmstools-checkout-lunar.stowbox.dev
+                          yields stowbox.dev. Set it in the project's .env.
+
+  WORKTREES               Where worktrees are kept. Exported from the shell
+                          config; must be set.
+EOF
+)
