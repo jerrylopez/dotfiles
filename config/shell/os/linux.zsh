@@ -13,6 +13,13 @@ then
   fpath=($HOMEBREW_PREFIX/share/zsh/site-functions $fpath)
 fi
 
+# Warden. Installed from its git checkout in /opt rather than a package, so
+# nothing else puts its bin on the path.
+if [[ -d /opt/warden/bin ]]
+then
+  export PATH="/opt/warden/bin:$PATH"
+fi
+
 # |----------------------------------------------------------------
 # | Variables
 # |----------------------------------------------------------------
