@@ -9,34 +9,52 @@ log() { >&2 echo "[warden-env] $*"; }
 
 # The herdr server is daemonised with the default system PATH — no
 # /opt/warden/bin, no Homebrew — and inherits nothing from the shell, so
-# warden is not on it. herdr has no setting for a plugin's environment, so the
-# path is rebuilt here instead. Each candidate is the directory a warden
-# install puts its binary in on one of the machines this runs on.
-for dir in /opt/warden/bin /usr/local/bin /opt/homebrew/bin "${HOME}/.warden/bin"; do
+# neither warden nor jq is on it. herdr has no setting for a plugin's
+# environment, so the path is rebuilt here instead. Each candidate is a
+# directory one of these tools installs into on a machine this runs on.
+for dir in \
+  /opt/warden/bin \
+  /home/linuxbrew/.linuxbrew/bin \
+  /opt/homebrew/bin \
+  /usr/local/bin \
+  "${HOME}/.warden/bin"
+do
   [[ -d "${dir}" ]] && PATH="${dir}:${PATH}"
 done
 export PATH
 
-if ! command -v warden >/dev/null 2>&1; then
-  log "warden is not on the path; nothing to do"
-  exit 0
-fi
+for tool in warden jq; do
+  if ! command -v "${tool}" >/dev/null 2>&1; then
+    log "${tool} is not on the path; nothing to do"
+    exit 0
+  fi
+done
 
-# The payload holds one checkout_path, so the first match is the only match and
-# bash's own expansion is enough to read it. Guarded because trimming a prefix
-# that is not there would return the whole document.
-EVENT="${HERDR_PLUGIN_EVENT_JSON:-}"
+# The path has sat under a couple of shapes across herdr versions — the payload
+# is currently wrapped as {"event", "data"} — so each candidate is tried in turn
+# and the first that holds a string wins.
+CHECKOUT="$(
+  jq -r '
+    [
+      .data.workspace.worktree.checkout_path?,
+      .data.worktree.path?,
+      .workspace.worktree.checkout_path?,
+      .worktree.path?,
+      .checkout_path?,
+      .path?
+    ]
+    | map(select(type == "string" and length > 0))
+    | first // empty
+  ' <<<"${HERDR_PLUGIN_EVENT_JSON:-}" 2>/dev/null
+)"
 
-if [[ "${EVENT}" != *'"checkout_path":"'* ]]; then
+if [[ -z "${CHECKOUT}" ]]; then
   log "no checkout path in the event payload; nothing to do"
   exit 0
 fi
 
-CHECKOUT="${EVENT#*\"checkout_path\":\"}"
-CHECKOUT="${CHECKOUT%%\"*}"
-
-if [[ -z "${CHECKOUT}" || ! -d "${CHECKOUT}" ]]; then
-  log "checkout '${CHECKOUT}' does not exist; nothing to do"
+if [[ ! -d "${CHECKOUT}" ]]; then
+  log "checkout ${CHECKOUT} does not exist; nothing to do"
   exit 0
 fi
 
