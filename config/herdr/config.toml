@@ -5,3 +5,11 @@ sidebar_width = 32
 
 [experimental]
 pane_history = false
+
+# Herdr creates <repo>/<branch-slug> under here. The literal path is spelled
+# out because herdr does not expand environment variables in this file — a
+# "$WORKTREES" value is taken as a relative path and lands in $HOME. On macOS
+# ~/worktrees is a link to the case-sensitive volume, so this one line holds
+# for both platforms. Keep it in step with $WORKTREES in config/shell/os/.
+[worktrees]
+directory = "~/worktrees"

@@ -1,98 +1,87 @@
 #!/usr/bin/env bash
 [[ ! ${WARDEN_DIR} ]] && >&2 echo -e "\033[31mThis script is not intended to be run directly!\033[0m" && exit 1
 
-## Creates a git worktree for the current project and gives it a Warden
-## environment of its own, so several branches of one project can run at the
-## same time without colliding on env name, domain or container names.
+## Gives an existing git worktree a Warden environment of its own, so several
+## branches of one project can run at the same time without colliding on
+## environment name, domain or container names.
 ##
-## Everything that distinguishes the worktree lives in .env.local, which Warden
-## loads after .env and lets override WARDEN_, TRAEFIK_ and PHP_ values. The
-## parent's .env is copied in first because it is gitignored, so a fresh
-## worktree has none, and Warden cannot see an environment without one.
+## Creating the worktree is herdr's job; this only configures one. That split is
+## why the command cannot start from locateEnvPath the way other Warden commands
+## do: a fresh worktree has no .env yet, so there is no environment to locate.
+## The parent checkout is found through git instead, and its .env read directly.
 ##
-## The path is printed on stdout and nothing else is, so the caller can capture
-## it: herdr worktree open --path "$(warden worktree feature-a)"
+## The path is the only thing on stdout, so the caller can capture it.
 
-WARDEN_ENV_PATH="$(locateEnvPath)" || exit $?
-loadEnvConfig "${WARDEN_ENV_PATH}" || exit $?
-
-## Progress goes to stderr to keep stdout clean for the path.
 function note { >&2 echo -e "\033[0;36m==>\033[0m $*"; }
 
-if [[ -z "${WORKTREES:-}" ]]; then
-  fatal "WORKTREES is not set. It is exported from config/shell/os/<platform>.zsh."
+TARGET="${WARDEN_PARAMS[0]:-$PWD}"
+[[ -d "${TARGET}" ]] || fatal "no such directory: ${TARGET}"
+TARGET="$(cd "${TARGET}" && pwd)"
+
+git -C "${TARGET}" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+  || fatal "${TARGET} is not inside a git repository"
+
+## --git-common-dir points at the main checkout's .git from anywhere in a linked
+## worktree, which is how the parent is found without being told where it is.
+COMMON_DIR="$(cd "${TARGET}" && cd "$(git rev-parse --git-common-dir)" && pwd)"
+PARENT="$(dirname "${COMMON_DIR}")"
+
+[[ "${PARENT}" == "${TARGET}" ]] && fatal "${TARGET} is the main checkout, not a worktree"
+
+## Warden identifies a project by these two keys in .env; without them the
+## parent is simply not a Warden project, which is not an error worth failing
+## on — herdr runs this against every worktree it creates.
+if [[ ! -f "${PARENT}/.env" ]] \
+  || ! grep -q "^WARDEN_ENV_NAME" "${PARENT}/.env" \
+  || ! grep -q "^WARDEN_ENV_TYPE" "${PARENT}/.env"
+then
+  note "${PARENT} is not a Warden project — nothing to configure"
+  printf '%s\n' "${TARGET}"
+  exit 0
 fi
 
-BRANCH=
-BASE=
-while (( ${#WARDEN_PARAMS[@]} )); do
-  case "${WARDEN_PARAMS[0]}" in
-    --base)
-      BASE="${WARDEN_PARAMS[1]:-}"
-      [[ ${BASE} ]] || fatal "--base needs a ref"
-      WARDEN_PARAMS=("${WARDEN_PARAMS[@]:2}")
-      ;;
-    -*)
-      fatal "unknown option ${WARDEN_PARAMS[0]}"
-      ;;
-    *)
-      [[ ${BRANCH} ]] && fatal "only one branch may be named"
-      BRANCH="${WARDEN_PARAMS[0]}"
-      WARDEN_PARAMS=("${WARDEN_PARAMS[@]:1}")
-      ;;
-  esac
-done
+## Read the parent's values without sourcing the file, which would run anything
+## a project happened to put in it.
+function parent_env {
+  sed 's/\r$//' "${PARENT}/.env" | grep "^${1}=" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//'
+}
 
-[[ ${BRANCH} ]] || fatal "usage: warden worktree <branch> [--base <ref>]"
+PROJECT="$(parent_env WARDEN_ENV_NAME)"
+PARENT_DOMAIN="$(parent_env TRAEFIK_DOMAIN)"
+CONFIGURED_BASE="$(parent_env WARDEN_WORKTREE_DOMAIN)"
 
-## A branch may contain characters a directory name and a hostname label cannot,
-## so the slug is what names the directory, the environment and the subdomain.
-SLUG="$(printf '%s' "${BRANCH}" | tr '/' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/--*/-/g; s/^-//; s/-$//')"
-[[ ${SLUG} ]] || fatal "branch '${BRANCH}' has no usable characters for a directory or hostname"
+[[ ${PROJECT} ]] || fatal "WARDEN_ENV_NAME is empty in ${PARENT}/.env"
 
-PROJECT="${WARDEN_ENV_NAME}"
+## The directory name is the slug: herdr has already reduced the branch to
+## something a path can hold, and matching it keeps the environment name and the
+## directory in step.
+SLUG="$(basename "${TARGET}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/--*/-/g; s/^-//; s/-$//')"
+[[ ${SLUG} ]] || fatal "'$(basename "${TARGET}")' leaves nothing usable as a hostname label"
 
-## The base domain is everything after the first label of the parent's domain,
-## so kmstools-checkout-lunar.stowbox.dev yields stowbox.dev. Set
-## WARDEN_WORKTREE_DOMAIN in .env to override; it is WARDEN_ prefixed, so the
-## machinery that loads .env and .env.local already carries it here.
-BASE_DOMAIN="${WARDEN_WORKTREE_DOMAIN:-${TRAEFIK_DOMAIN#*.}}"
-[[ ${BASE_DOMAIN} && ${BASE_DOMAIN} != "${TRAEFIK_DOMAIN}" ]] \
-  || fatal "cannot derive a base domain from TRAEFIK_DOMAIN='${TRAEFIK_DOMAIN}'; set WARDEN_WORKTREE_DOMAIN"
+## Everything after the first label of the parent's domain, so
+## kmstools-checkout-lunar.stowbox.dev yields stowbox.dev. WARDEN_WORKTREE_DOMAIN
+## in the parent's .env overrides it.
+BASE_DOMAIN="${CONFIGURED_BASE:-${PARENT_DOMAIN#*.}}"
+[[ ${BASE_DOMAIN} && ${BASE_DOMAIN} != "${PARENT_DOMAIN}" ]] \
+  || fatal "cannot derive a base domain from TRAEFIK_DOMAIN='${PARENT_DOMAIN}'; set WARDEN_WORKTREE_DOMAIN in ${PARENT}/.env"
 
 ENV_NAME="${PROJECT}-${SLUG}"
 DOMAIN="${ENV_NAME}.${BASE_DOMAIN}"
-DEST="${WORKTREES}/${PROJECT}/${SLUG}"
 
-[[ -e "${DEST}" ]] && fatal "${DEST} already exists"
-
-cd "${WARDEN_ENV_PATH}" || fatal "cannot enter ${WARDEN_ENV_PATH}"
-
-## An existing branch is checked out as-is; a remote-only one starts tracking;
-## anything else is created, from --base when given.
-note "creating worktree at ${DEST}"
-mkdir -p "$(dirname "${DEST}")"
-
-if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
-  git worktree add "${DEST}" "${BRANCH}" >&2 || fatal "git worktree add failed"
-elif git show-ref --verify --quiet "refs/remotes/origin/${BRANCH}"; then
-  git worktree add "${DEST}" -b "${BRANCH}" --track "origin/${BRANCH}" >&2 || fatal "git worktree add failed"
+## .env is gitignored, so a fresh worktree has none and Warden cannot see an
+## environment at all. An existing one is left alone: it is either a rerun or
+## something the project put there deliberately.
+if [[ -f "${TARGET}/.env" ]]; then
+  note "${TARGET}/.env exists — leaving it alone"
 else
-  git worktree add "${DEST}" -b "${BRANCH}" ${BASE:+"${BASE}"} >&2 || fatal "git worktree add failed"
-fi
-
-## Warden needs a .env to see an environment at all, and it is gitignored, so
-## the parent's is the only copy available to seed from.
-if [[ -f "${WARDEN_ENV_PATH}/.env" ]]; then
-  cp "${WARDEN_ENV_PATH}/.env" "${DEST}/.env"
-  note "copied .env from the parent checkout"
-else
-  warning "no .env in ${WARDEN_ENV_PATH}; the worktree has none either"
+  cp "${PARENT}/.env" "${TARGET}/.env"
+  note "copied .env from ${PARENT}"
 fi
 
 note "writing .env.local — env ${ENV_NAME}, domain ${DOMAIN}"
-cat > "${DEST}/.env.local" <<LOCAL
-## Written by 'warden worktree'. Loaded after .env and overrides it.
+cat > "${TARGET}/.env.local" <<LOCAL
+## Written by 'warden worktree'. Warden loads this after .env and lets it
+## override WARDEN_, TRAEFIK_ and PHP_ values.
 WARDEN_ENV_NAME=${ENV_NAME}
 TRAEFIK_DOMAIN=${DOMAIN}
 LOCAL
@@ -100,9 +89,8 @@ LOCAL
 >&2 echo
 >&2 echo -e "    env     \033[0;32m${ENV_NAME}\033[0m"
 >&2 echo -e "    domain  \033[0;32mhttps://${DOMAIN}\033[0m"
->&2 echo
->&2 echo -e "    next    cd into it, then 'warden env up'. Application-level values"
->&2 echo -e "            such as APP_URL live in .env and are not overridden here."
+>&2 echo -e "    next    'warden env up' from within the worktree. Application-level"
+>&2 echo -e "            values such as APP_URL live in .env and are not overridden."
 >&2 echo
 
-printf '%s\n' "${DEST}"
+printf '%s\n' "${TARGET}"

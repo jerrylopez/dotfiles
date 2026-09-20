@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Runs when herdr creates a worktree. Hands it to `warden worktree`, which
+# configures a Warden environment for it, or does nothing if the project is not
+# a Warden one.
+#
+# The herdr server runs with a minimal PATH — no /opt/warden/bin, no Homebrew —
+# so nothing here may assume a login shell's environment. warden is located
+# explicitly and the payload is parsed with the system python rather than jq.
+
+set -uo pipefail
+
+log() { >&2 echo "[warden-env] $*"; }
+
+CHECKOUT="$(
+  python3 - <<'PY' 2>/dev/null
+import json, os, sys
+
+raw = os.environ.get("HERDR_PLUGIN_EVENT_JSON") or ""
+try:
+    event = json.loads(raw)
+except ValueError:
+    sys.exit(0)
+
+# The payload arrives wrapped as {"event": ..., "data": {...}}, but try the
+# bare object too so an unwrapped shape keeps working.
+roots = [event]
+if isinstance(event, dict) and isinstance(event.get("data"), dict):
+    roots.insert(0, event["data"])
+
+keys = (
+    ("workspace", "worktree", "checkout_path"),
+    ("worktree", "path"),
+    ("checkout_path",),
+    ("path",),
+)
+
+for root in roots:
+    for key in keys:
+        node = root
+        for part in key:
+            node = node.get(part) if isinstance(node, dict) else None
+            if node is None:
+                break
+        if isinstance(node, str) and node:
+            print(node)
+            sys.exit(0)
+PY
+)"
+
+if [[ -z "${CHECKOUT}" ]]; then
+  log "no checkout path in the event payload; nothing to do"
+  exit 0
+fi
+
+if [[ ! -d "${CHECKOUT}" ]]; then
+  log "checkout ${CHECKOUT} does not exist; nothing to do"
+  exit 0
+fi
+
+WARDEN=""
+for candidate in "$(command -v warden 2>/dev/null)" /opt/warden/bin/warden /usr/local/bin/warden "${HOME}/.warden/bin/warden"; do
+  if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+    WARDEN="${candidate}"
+    break
+  fi
+done
+
+if [[ -z "${WARDEN}" ]]; then
+  log "warden not found; leaving ${CHECKOUT} unconfigured"
+  exit 0
+fi
+
+log "configuring ${CHECKOUT}"
+"${WARDEN}" worktree "${CHECKOUT}" >/dev/null || log "warden worktree exited ${?}"

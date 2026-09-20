@@ -1,0 +1,10 @@
+id = "jerrylopez.warden-env"
+name = "Warden environment"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Gives each new worktree its own Warden environment, name and domain"
+platforms = ["linux", "macos"]
+
+[[events]]
+on = "worktree.created"
+command = ["./on-worktree-created"]

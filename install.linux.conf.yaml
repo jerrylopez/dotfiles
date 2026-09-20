@@ -16,3 +16,7 @@
     ~/.warden/commands:
       path: config/warden/commands
       create: true
+    # herdr runs on this box as well as the Mac; the config itself is shared.
+    ~/.config/herdr/config.toml:
+      path: config/herdr/config.toml
+      create: true

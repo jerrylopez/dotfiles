@@ -17,5 +17,8 @@
     ~/.config/herdr/config.toml:
       path: config/herdr/config.toml
       create: true
+    # herdr's config names ~/worktrees literally, so on macOS that path has
+    # to lead to the case-sensitive volume $WORKTREES points at.
+    ~/worktrees: /Volumes/CaseSensitive/Worktrees
     # Default; hyper+` repoints this to external.toml at runtime.
     ~/.aerospace.toml: config/aerospace/laptop.toml
