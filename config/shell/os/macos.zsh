@@ -20,4 +20,7 @@ fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 # The project folder that we can `c [tab]` to
 export PROJECTS=/Volumes/CaseSensitive/Code
 
+# The sibling folder that git worktrees are checked out into
+export WORKTREES=/Volumes/CaseSensitive/Worktrees
+
 export EDITOR='code'

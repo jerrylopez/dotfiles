@@ -20,5 +20,8 @@ fi
 # The project folder that we can `c [tab]` to
 export PROJECTS=$HOME/code
 
+# The sibling folder that git worktrees are checked out into
+export WORKTREES=$HOME/worktrees
+
 # This box is headless, so the Mac's `code` is not an option here.
 export EDITOR='nvim'

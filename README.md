@@ -72,7 +72,7 @@ config/
   nvim/                         LazyVim; lazy-lock.json is committed
   shell/                        aliases, exports, functions — plus os/
   zsh/                          zshrc and core zsh config
-  bin/                          wt, on PATH
+  bin/                          personal scripts, on PATH
   git/ claude/ agents/ composer/ herdr/
 script/                         bootstrap, install, update, lib/platform
 install.conf.yaml               shared links (+ .macos, .linux)

@@ -6,6 +6,10 @@ c() {
     cd "$PROJECTS/$1"
 }
 
+wt() {
+    cd "$WORKTREES/$1"
+}
+
 update() {
     $DOTFILES/script/update
 }
