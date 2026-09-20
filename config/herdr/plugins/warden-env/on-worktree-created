@@ -2,73 +2,43 @@
 # Runs when herdr creates a worktree. Hands it to `warden worktree`, which
 # configures a Warden environment for it, or does nothing if the project is not
 # a Warden one.
-#
-# The herdr server runs with a minimal PATH — no /opt/warden/bin, no Homebrew —
-# so nothing here may assume a login shell's environment. warden is located
-# explicitly and the payload is parsed with the system python rather than jq.
 
 set -uo pipefail
 
 log() { >&2 echo "[warden-env] $*"; }
 
-CHECKOUT="$(
-  python3 - <<'PY' 2>/dev/null
-import json, os, sys
+# The herdr server is daemonised with the default system PATH — no
+# /opt/warden/bin, no Homebrew — and inherits nothing from the shell, so
+# warden is not on it. herdr has no setting for a plugin's environment, so the
+# path is rebuilt here instead. Each candidate is the directory a warden
+# install puts its binary in on one of the machines this runs on.
+for dir in /opt/warden/bin /usr/local/bin /opt/homebrew/bin "${HOME}/.warden/bin"; do
+  [[ -d "${dir}" ]] && PATH="${dir}:${PATH}"
+done
+export PATH
 
-raw = os.environ.get("HERDR_PLUGIN_EVENT_JSON") or ""
-try:
-    event = json.loads(raw)
-except ValueError:
-    sys.exit(0)
+if ! command -v warden >/dev/null 2>&1; then
+  log "warden is not on the path; nothing to do"
+  exit 0
+fi
 
-# The payload arrives wrapped as {"event": ..., "data": {...}}, but try the
-# bare object too so an unwrapped shape keeps working.
-roots = [event]
-if isinstance(event, dict) and isinstance(event.get("data"), dict):
-    roots.insert(0, event["data"])
+# The payload holds one checkout_path, so the first match is the only match and
+# bash's own expansion is enough to read it. Guarded because trimming a prefix
+# that is not there would return the whole document.
+EVENT="${HERDR_PLUGIN_EVENT_JSON:-}"
 
-keys = (
-    ("workspace", "worktree", "checkout_path"),
-    ("worktree", "path"),
-    ("checkout_path",),
-    ("path",),
-)
-
-for root in roots:
-    for key in keys:
-        node = root
-        for part in key:
-            node = node.get(part) if isinstance(node, dict) else None
-            if node is None:
-                break
-        if isinstance(node, str) and node:
-            print(node)
-            sys.exit(0)
-PY
-)"
-
-if [[ -z "${CHECKOUT}" ]]; then
+if [[ "${EVENT}" != *'"checkout_path":"'* ]]; then
   log "no checkout path in the event payload; nothing to do"
   exit 0
 fi
 
-if [[ ! -d "${CHECKOUT}" ]]; then
-  log "checkout ${CHECKOUT} does not exist; nothing to do"
-  exit 0
-fi
+CHECKOUT="${EVENT#*\"checkout_path\":\"}"
+CHECKOUT="${CHECKOUT%%\"*}"
 
-WARDEN=""
-for candidate in "$(command -v warden 2>/dev/null)" /opt/warden/bin/warden /usr/local/bin/warden "${HOME}/.warden/bin/warden"; do
-  if [[ -n "${candidate}" && -x "${candidate}" ]]; then
-    WARDEN="${candidate}"
-    break
-  fi
-done
-
-if [[ -z "${WARDEN}" ]]; then
-  log "warden not found; leaving ${CHECKOUT} unconfigured"
+if [[ -z "${CHECKOUT}" || ! -d "${CHECKOUT}" ]]; then
+  log "checkout '${CHECKOUT}' does not exist; nothing to do"
   exit 0
 fi
 
 log "configuring ${CHECKOUT}"
-"${WARDEN}" worktree "${CHECKOUT}" >/dev/null || log "warden worktree exited ${?}"
+warden worktree "${CHECKOUT}" >/dev/null || log "warden worktree exited ${?}"
