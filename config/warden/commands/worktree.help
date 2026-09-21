@@ -17,26 +17,37 @@ WARDEN_USAGE=$(cat <<EOF
   to configure a worktree made some other way, or to redo one.
 
   With no argument it works on the current directory. The parent checkout is
-  found through git, and its .env read for the project name and domain. The
+  found through git, and its config read for the project name and domain. The
   environment becomes \033[32m<project>-<directory>\033[0m and the domain
   \033[32m<project>-<directory>.<base domain>\033[0m.
 
-  The parent's .env is copied in, since it is gitignored and Warden cannot
-  detect an environment without one; an existing .env is left alone. The name
-  and domain are then written to .env.local, which Warden loads after .env and
-  lets override WARDEN_, TRAEFIK_ and PHP_ values. Application-level settings
-  such as APP_URL are not touched.
+  The name and domain are written to the worktree's \033[32m.local\033[0m
+  override, which Warden loads after the main config and lets override
+  WARDEN_, TRAEFIK_ and PHP_ values. Application-level settings such as
+  APP_URL are not touched.
 
   A parent that is not a Warden project is reported and skipped, not treated
   as an error: the command runs against every worktree herdr creates.
 
   The path is the only thing printed on stdout, so it can be captured.
 
+\033[33mConfig filenames:\033[0m
+  Warden reads \033[32m.warden.env\033[0m, falling back to the deprecated
+  \033[32m.env\033[0m, and pairs the \033[32m.local\033[0m override with
+  whichever it resolved. This command follows the parent's choice rather than
+  imposing one, so a project on .warden.env gets .warden.env.local and one
+  still on .env gets .env.local.
+
+  A committed .warden.env arrives with the checkout, so there is nothing to
+  copy. A project still on .env has it gitignored — Warden cannot detect an
+  environment without one — so the parent's is copied in. An existing config
+  in the worktree is left alone either way.
+
 \033[33mConfiguration:\033[0m
   WARDEN_WORKTREE_DOMAIN  Base domain for worktree environments. Defaults to
                           the parent's TRAEFIK_DOMAIN with its first label
                           removed, so kmstools-checkout-lunar.stowbox.dev
-                          yields stowbox.dev. Set it in the parent's .env.
+                          yields stowbox.dev. Set it in the parent's config.
 
 \033[33mSee also:\033[0m
   The directory herdr creates worktrees in is worktrees.directory in
