@@ -1,5 +1,6 @@
 {
     "require": {
-        "cpx/cpx": "^2.1"
+        "cpx/cpx": "^2.1",
+        "laravel/lsp": "^0.0"
     }
 }
