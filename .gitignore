@@ -1,3 +1,7 @@
 .DS_Store
 ._*
 .Trashes
+# Claude Code syncs claude.ai skills here, and trashes them here once
+# syncClaudeAiSkills is off. Neither belongs in the repo.
+config/agents/skills/synced/
+config/agents/skills/.trash/

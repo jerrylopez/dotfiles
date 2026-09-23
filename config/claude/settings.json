@@ -98,5 +98,6 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-daltonized",
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "syncClaudeAiSkills": false
 }
