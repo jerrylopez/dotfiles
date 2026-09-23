@@ -10,6 +10,24 @@ wt() {
     cd "$WORKTREES/$1"
 }
 
+# Inside a linked git worktree, $parent is the main checkout it was created
+# from, so `cp $parent/.env .` works from anywhere in the tree. It is unset
+# everywhere else, so a stale value never points at the wrong repo.
+_set_worktree_parent() {
+    local dirs
+    dirs=(${(f)"$(git rev-parse --path-format=absolute --git-dir --git-common-dir 2>/dev/null)"})
+
+    if [[ ${#dirs} -eq 2 && $dirs[1] != $dirs[2] && $dirs[2]:t == .git ]]; then
+        parent=$dirs[2]:h
+    else
+        unset parent
+    fi
+}
+
+autoload -U add-zsh-hook
+add-zsh-hook chpwd _set_worktree_parent
+_set_worktree_parent
+
 update() {
     $DOTFILES/script/update
 }
