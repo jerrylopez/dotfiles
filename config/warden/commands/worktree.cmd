@@ -58,15 +58,22 @@ if ! PARENT_ENV_FILE="$(locateConfig "${PARENT}" markers)"; then
   exit 0
 fi
 
-## Read the parent's values without sourcing the file, which would run anything
-## a project happened to put in it.
-function parent_env {
-  sed 's/\r$//' "${PARENT_ENV_FILE}" | grep "^${1}=" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//'
+## Read config values without sourcing the file, which would run anything a
+## project happened to put in it.
+function env_value {
+  [[ -f "${1}" ]] || return 0
+  sed 's/\r$//' "${1}" | grep "^${2}=" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//'
 }
+
+function parent_env { env_value "${PARENT_ENV_FILE}" "${1}"; }
 
 PROJECT="$(parent_env WARDEN_ENV_NAME)"
 PARENT_DOMAIN="$(parent_env TRAEFIK_DOMAIN)"
+
+## A base domain set in the parent's config is about that one project, so it
+## wins over the machine-wide default in Warden's own ~/.warden/.env.
 CONFIGURED_BASE="$(parent_env WARDEN_WORKTREE_DOMAIN)"
+CONFIGURED_BASE="${CONFIGURED_BASE:-$(env_value "${WARDEN_HOME_DIR}/.env" WARDEN_WORKTREE_DOMAIN)}"
 
 [[ ${PROJECT} ]] || fatal "WARDEN_ENV_NAME is empty in ${PARENT_ENV_FILE}"
 
@@ -76,12 +83,12 @@ CONFIGURED_BASE="$(parent_env WARDEN_WORKTREE_DOMAIN)"
 SLUG="$(basename "${TARGET}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/--*/-/g; s/^-//; s/-$//')"
 [[ ${SLUG} ]] || fatal "'$(basename "${TARGET}")' leaves nothing usable as a hostname label"
 
-## Everything after the first label of the parent's domain, so
-## kmstools-checkout-lunar.stowbox.dev yields stowbox.dev. WARDEN_WORKTREE_DOMAIN
-## in the parent's config overrides it.
+## With WARDEN_WORKTREE_DOMAIN set nowhere, fall back to everything after the
+## first label of the parent's domain, so kmstools-checkout-lunar.stowbox.dev
+## yields stowbox.dev.
 BASE_DOMAIN="${CONFIGURED_BASE:-${PARENT_DOMAIN#*.}}"
 [[ ${BASE_DOMAIN} && ${BASE_DOMAIN} != "${PARENT_DOMAIN}" ]] \
-  || fatal "cannot derive a base domain from TRAEFIK_DOMAIN='${PARENT_DOMAIN}'; set WARDEN_WORKTREE_DOMAIN in ${PARENT_ENV_FILE}"
+  || fatal "cannot derive a base domain from TRAEFIK_DOMAIN='${PARENT_DOMAIN}'; set WARDEN_WORKTREE_DOMAIN in ${PARENT_ENV_FILE} or ${WARDEN_HOME_DIR}/.env"
 
 ENV_NAME="${PROJECT}-${SLUG}"
 DOMAIN="${ENV_NAME}.${BASE_DOMAIN}"

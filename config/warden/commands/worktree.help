@@ -44,10 +44,20 @@ WARDEN_USAGE=$(cat <<EOF
   in the worktree is left alone either way.
 
 \033[33mConfiguration:\033[0m
-  WARDEN_WORKTREE_DOMAIN  Base domain for worktree environments. Defaults to
-                          the parent's TRAEFIK_DOMAIN with its first label
-                          removed, so kmstools-checkout-lunar.stowbox.dev
-                          yields stowbox.dev. Set it in the parent's config.
+  WARDEN_WORKTREE_DOMAIN  Base domain for worktree environments. The worktree
+                          is given \033[32m<project>-<directory>\033[0m as a
+                          subdomain of it.
+
+                          Read from the parent's config first, then from
+                          Warden's own \033[32m~/.warden/.env\033[0m, so one
+                          line there — WARDEN_WORKTREE_DOMAIN=stowbox.dev —
+                          covers every project on the machine and a project
+                          that needs a different domain overrides it locally.
+
+                          Set in neither, it falls back to the parent's
+                          TRAEFIK_DOMAIN with its first label removed, so
+                          kmstools-checkout-lunar.stowbox.dev yields
+                          stowbox.dev.
 
 \033[33mSee also:\033[0m
   The directory herdr creates worktrees in is worktrees.directory in
