@@ -35,6 +35,9 @@ brew 'zsh'
 brew 'zsh-completions'
 
 cask '1password'
+# The @latest cask tracks the latest release channel; the plain claude-code
+# cask tracks stable, and the two conflict, so only one can be listed.
+cask 'claude-code@latest'
 cask 'fantastical'
 # The patched build rather than the plain one, for the glyphs the zsh prompt
 # draws its badges out of. Same typeface, same metrics.

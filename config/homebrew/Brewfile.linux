@@ -1,7 +1,8 @@
 # Linux, headless.
 #
-# No casks: there is no GUI on this box. And no coreutils, which the Mac needs
-# to get GNU tools but Linux already ships as its system default.
+# The only cask here is a CLI binary; the GUI casks stay on the Mac, since
+# there is no desktop on this box. And no coreutils, which the Mac needs to
+# get GNU tools but Linux already ships as its system default.
 
 tap 'jondot/tap'
 
@@ -35,3 +36,8 @@ brew 'spaceman-diff'
 brew 'wget'
 brew 'zsh'
 brew 'zsh-completions'
+
+# Claude Code ships as a prebuilt binary rather than a formula. The @latest
+# cask tracks the latest release channel; the plain claude-code cask tracks
+# stable, and the two conflict, so only one can be listed.
+cask 'claude-code@latest'
