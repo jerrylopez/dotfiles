@@ -67,7 +67,7 @@ configure.
 
 ```
 config/
-  aerospace/ ghostty/ vscode/   macOS GUI apps
+  aerospace/ ghostty/ vscode/   macOS GUI apps (+ hammerspoon/)
   homebrew/                     Brewfile.macos, Brewfile.linux
   nvim/                         LazyVim; lazy-lock.json is committed
   shell/                        aliases, exports, functions — plus os/

@@ -23,7 +23,7 @@ outer.bottom = 10
 ctrl-alt-shift-cmd-1 = 'workspace 1'   # Ghostty
 ctrl-alt-shift-cmd-2 = 'workspace 2'   # Arc
 ctrl-alt-shift-cmd-3 = 'workspace 3'   # comms
-ctrl-alt-shift-cmd-4 = 'workspace 4'   # Linear + Things
+ctrl-alt-shift-cmd-4 = 'workspace 4'   # Linear
 ctrl-alt-shift-cmd-tab = 'workspace-back-and-forth'
 
 # Group the focused window with its neighbour into a container. Nested
@@ -67,11 +67,13 @@ run = ['move-node-to-workspace 3', 'layout h_accordion']
 if.app-id = 'com.mimestream.Mimestream'
 run = ['move-node-to-workspace 3', 'layout h_accordion']
 
-# Linear and Things.
+# Linear.
 [[on-window-detected]]
 if.app-id = 'com.linear'
 run = ['move-node-to-workspace 4', 'layout h_accordion']
 
+# Things floats rather than tiling, and hyper+t in Hammerspoon slides it
+# in over whichever one is focused (config/hammerspoon/init.lua).
 [[on-window-detected]]
 if.app-id = 'com.culturedcode.ThingsMac'
-run = ['move-node-to-workspace 4', 'layout h_accordion']
+run = 'layout floating'
