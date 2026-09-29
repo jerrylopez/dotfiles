@@ -20,11 +20,18 @@ local aerospace = "/opt/homebrew/bin/aerospace"
 -- belongs to one, and focusing it switches there. So before sliding in, the
 -- window is moved onto the focused workspace — that is what makes it reachable
 -- from all of them.
+--
+-- Put away, it is parked on a workspace of its own rather than hidden with
+-- macOS's Hide. AeroSpace takes a hidden app's windows out of its layout, and
+-- a window moved to a workspace while still hidden gets tiled there until the
+-- unhide registers, squeezing the workspace's windows for a moment. Parked
+-- on a workspace, it stays floating throughout.
 
 local things = {
   bundleID = "com.culturedcode.ThingsMac",
   width = 0.4, -- fraction of the screen
   duration = 0.2,
+  parking = "scratchpad", -- the workspace it waits on while put away
 }
 
 -- AeroSpace's outer gaps, read from whichever config ~/.aerospace.toml points
@@ -60,11 +67,21 @@ local function thingsWindow(app)
   return app:mainWindow() or app:allWindows()[1]
 end
 
+local function aerospaceRun(args)
+  return (hs.execute(aerospace .. " " .. args .. " 2>/dev/null"):gsub("%s+$", ""))
+end
+
+-- AeroSpace's layout for the window, e.g. "floating", or
+-- "macos_native_window_of_hidden_app" while its app is hidden.
+local function aerospaceLayout(win)
+  return aerospaceRun(string.format(
+    "list-windows --all --format '%%{window-id} %%{window-layout}' | awk '$1 == %d { print $2 }'", win:id()))
+end
+
 local function slideIn(app, win)
   local screen = hs.screen.mainScreen()
-
-  local workspace = hs.execute(aerospace .. " list-workspaces --focused"):gsub("%s+$", "")
-  hs.execute(string.format("%s move-node-to-workspace --window-id %d %s", aerospace, win:id(), workspace))
+  local workspace = aerospaceRun("list-workspaces --focused")
+  aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), workspace))
 
   -- Size it off screen first, then place it by the width Things accepted.
   local _, hidden = thingsFrames(screen)
@@ -78,7 +95,17 @@ end
 local function slideOut(app, win)
   local _, hidden = thingsFrames(win:screen(), win:frame().w)
   win:setFrame(hidden, things.duration)
-  hs.timer.doAfter(things.duration, function() app:hide() end)
+  hs.timer.doAfter(things.duration, function()
+    aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), things.parking))
+  end)
+end
+
+-- Once Things has a window AeroSpace no longer counts as hidden, slide it in.
+local function slideInWhenReady(app)
+  hs.timer.waitUntil(function()
+    local win = thingsWindow(app)
+    return win ~= nil and aerospaceLayout(win) ~= "macos_native_window_of_hidden_app"
+  end, function() slideIn(app, thingsWindow(app)) end, 0.05)
 end
 
 local function toggleThings()
@@ -89,24 +116,24 @@ local function toggleThings()
     hs.application.launchOrFocusByBundleID(things.bundleID)
     hs.timer.waitUntil(function()
       app = hs.application.get(things.bundleID)
-      return app and thingsWindow(app) ~= nil
-    end, function() slideIn(app, thingsWindow(app)) end, 0.1)
+      return app ~= nil
+    end, function() slideInWhenReady(app) end, 0.1)
     return
   end
 
-  if app:isHidden() then app:unhide() end
-  local win = thingsWindow(app)
-  if not win then
-    -- Running with its window closed; reopening Things brings one back.
-    hs.application.launchOrFocusByBundleID(things.bundleID)
-    hs.timer.waitUntil(function() return thingsWindow(app) ~= nil end,
-      function() slideIn(app, thingsWindow(app)) end, 0.1)
+  -- Hidden with cmd-h, or its window closed: bring it back, and wait for
+  -- AeroSpace to see it before moving it, for the reason at the top.
+  if app:isHidden() or not thingsWindow(app) then
+    app:unhide()
+    if not thingsWindow(app) then hs.application.launchOrFocusByBundleID(things.bundleID) end
+    slideInWhenReady(app)
     return
   end
 
   -- Focused means it is on screen in front of you: put it away. Anything
-  -- else — hidden, on another workspace, or just behind the window you
+  -- else — parked, on another workspace, or just behind the window you
   -- clicked into — brings it here.
+  local win = thingsWindow(app)
   if hs.window.focusedWindow() == win then
     slideOut(app, win)
   else
