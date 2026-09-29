@@ -1,6 +1,7 @@
 cask_args appdir: '/Applications'
 
 tap 'jondot/tap'
+tap 'mutagen-io/mutagen'
 
 brew 'ack'
 brew 'coreutils'
@@ -18,6 +19,7 @@ brew 'neovim'
 brew 'ripgrep'
 brew 'fd'
 brew 'lazygit'
+brew 'mutagen-io/mutagen/mutagen-beta'
 brew 'openssl'
 # PHP came from Homebrew rather than Herd even while Herd was installed, so
 # uninstalling it changed nothing here except that this is now the only source.
@@ -29,6 +31,9 @@ brew 'readline'
 brew 'pv'
 brew 'roundup'
 brew 'spaceman-diff'
+# The VPS runs the Warden environments day to day; this copy is for the
+# occasional deploy run from the Mac. Mutagen is what it syncs code with.
+brew 'wardenenv/warden/warden'
 brew 'wget'
 brew 'youtube-dl'
 brew 'zsh'
