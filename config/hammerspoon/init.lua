@@ -71,17 +71,23 @@ local function aerospaceRun(args)
   return (hs.execute(aerospace .. " " .. args .. " 2>/dev/null"):gsub("%s+$", ""))
 end
 
+-- One of AeroSpace's fields for the window, e.g. "window-layout" or "workspace".
+local function aerospaceWindow(win, field)
+  return aerospaceRun(string.format(
+    "list-windows --all --format '%%{window-id} %%{%s}' | awk '$1 == %d { print $2 }'", field, win:id()))
+end
+
 -- AeroSpace's layout for the window, e.g. "floating", or
 -- "macos_native_window_of_hidden_app" while its app is hidden.
 local function aerospaceLayout(win)
-  return aerospaceRun(string.format(
-    "list-windows --all --format '%%{window-id} %%{window-layout}' | awk '$1 == %d { print $2 }'", win:id()))
+  return aerospaceWindow(win, "window-layout")
 end
 
 local function slideIn(app, win)
   local screen = hs.screen.mainScreen()
   local workspace = aerospaceRun("list-workspaces --focused")
   aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), workspace))
+  things.parked = false
 
   -- Size it off screen first, then place it by the width Things accepted.
   local _, hidden = thingsFrames(screen)
@@ -97,6 +103,7 @@ local function slideOut(app, win)
   win:setFrame(hidden, things.duration)
   hs.timer.doAfter(things.duration, function()
     aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), things.parking))
+    things.parked = true
   end)
 end
 
@@ -142,3 +149,31 @@ local function toggleThings()
 end
 
 hs.hotkey.bind(hyper, "t", toggleThings)
+
+-- Whether Things is waiting on the parking workspace. Tracked here rather than
+-- asked of AeroSpace when it matters, because the watcher below is racing
+-- AeroSpace and every CLI call costs it ~35ms. A reload starts from the truth.
+do
+  local app = hs.application.get(things.bundleID)
+  local win = app and thingsWindow(app)
+  things.parked = win ~= nil and aerospaceWindow(win, "workspace") == things.parking
+end
+
+-- cmd-tab and the Dock slide it in too. Either one focuses the parked window,
+-- and AeroSpace answers that by switching to the parking workspace, a moment
+-- later. Moved onto the focused workspace before then, there is nowhere to
+-- switch to; if AeroSpace got there first, it is sent back where it came from.
+-- Only a parked Things is pulled over: one left open on another workspace is
+-- where you left it, and switching there is what focusing it should do.
+things.watcher = hs.application.watcher.new(function(_, event, app)
+  if event ~= hs.application.watcher.activated or app:bundleID() ~= things.bundleID then return end
+
+  local win = thingsWindow(app)
+  if not win or not things.parked then return end
+
+  if aerospaceRun("list-workspaces --focused") == things.parking then
+    aerospaceRun("workspace-back-and-forth")
+  end
+  slideIn(app, win)
+end)
+things.watcher:start()
