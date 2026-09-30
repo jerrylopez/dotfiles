@@ -72,8 +72,8 @@ run = ['move-node-to-workspace 3', 'layout h_accordion']
 if.app-id = 'com.linear'
 run = ['move-node-to-workspace 4', 'layout h_accordion']
 
-# Things floats rather than tiling, and hyper+t in Hammerspoon slides it
-# in over whichever one is focused (config/hammerspoon/init.lua).
+# Things floats rather than tiling, and hyper+t in Hammerspoon shows it
+# over whichever one is focused (config/hammerspoon/init.lua).
 [[on-window-detected]]
 if.app-id = 'com.culturedcode.ThingsMac'
 run = 'layout floating'

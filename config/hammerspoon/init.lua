@@ -14,12 +14,12 @@ local aerospace = "/opt/homebrew/bin/aerospace"
 -- | Things drawer
 -- |----------------------------------------------------------------
 --
--- hyper+t slides Things in from the right edge of whichever workspace is
--- focused, and slides it back out again. AeroSpace floats Things rather than
--- tiling it (see config/aerospace), and its workspaces are emulated: a window
--- belongs to one, and focusing it switches there. So before sliding in, the
--- window is moved onto the focused workspace — that is what makes it reachable
--- from all of them.
+-- hyper+t shows Things against the right edge of whichever workspace is
+-- focused, and puts it away again, both without animating. AeroSpace floats
+-- Things rather than tiling it (see config/aerospace), and its workspaces are
+-- emulated: a window belongs to one, and focusing it switches there. So before
+-- showing it, the window is moved onto the focused workspace — that is what
+-- makes it reachable from all of them.
 --
 -- Put away, it is parked on a workspace of its own rather than hidden with
 -- macOS's Hide. AeroSpace takes a hidden app's windows out of its layout, and
@@ -30,7 +30,6 @@ local aerospace = "/opt/homebrew/bin/aerospace"
 local things = {
   bundleID = "com.culturedcode.ThingsMac",
   width = 0.4, -- fraction of the screen
-  duration = 0.2,
   parking = "scratchpad", -- the workspace it waits on while put away
 }
 
@@ -51,7 +50,7 @@ local function aerospaceOuterGaps()
 end
 
 -- The drawer's resting frame, and the same frame pushed just off the right
--- edge. `width` is what the window actually is, when that is known: Things has
+-- edge, where it can be sized without being seen. `width` is what the window actually is, when that is known: Things has
 -- a minimum width (590pt), and on a narrow screen the fraction asks for less,
 -- so anchoring the fraction to the edge would push the window past it.
 local function thingsFrames(screen, width)
@@ -83,7 +82,7 @@ local function aerospaceLayout(win)
   return aerospaceWindow(win, "window-layout")
 end
 
-local function slideIn(app, win)
+local function showThings(app, win)
   local screen = hs.screen.mainScreen()
   local workspace = aerospaceRun("list-workspaces --focused")
   aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), workspace))
@@ -92,39 +91,33 @@ local function slideIn(app, win)
   -- Size it off screen first, then place it by the width Things accepted.
   local _, hidden = thingsFrames(screen)
   win:setFrame(hidden, 0)
-  local shown, parked = thingsFrames(screen, win:frame().w)
-  win:setFrame(parked, 0)
-  win:setFrame(shown, things.duration)
+  win:setFrame((thingsFrames(screen, win:frame().w)), 0)
   win:focus()
 end
 
-local function slideOut(app, win)
-  local _, hidden = thingsFrames(win:screen(), win:frame().w)
-  win:setFrame(hidden, things.duration)
-  hs.timer.doAfter(things.duration, function()
-    aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), things.parking))
-    things.parked = true
-  end)
+local function putAwayThings(win)
+  aerospaceRun(string.format("move-node-to-workspace --window-id %d %s", win:id(), things.parking))
+  things.parked = true
 end
 
--- Once Things has a window AeroSpace no longer counts as hidden, slide it in.
-local function slideInWhenReady(app)
+-- Once Things has a window AeroSpace no longer counts as hidden, show it.
+local function showThingsWhenReady(app)
   hs.timer.waitUntil(function()
     local win = thingsWindow(app)
     return win ~= nil and aerospaceLayout(win) ~= "macos_native_window_of_hidden_app"
-  end, function() slideIn(app, thingsWindow(app)) end, 0.05)
+  end, function() showThings(app, thingsWindow(app)) end, 0.05)
 end
 
 local function toggleThings()
   local app = hs.application.get(things.bundleID)
 
-  -- Not running yet: launch it, then slide in once it has a window.
+  -- Not running yet: launch it, then show it once it has a window.
   if not app then
     hs.application.launchOrFocusByBundleID(things.bundleID)
     hs.timer.waitUntil(function()
       app = hs.application.get(things.bundleID)
       return app ~= nil
-    end, function() slideInWhenReady(app) end, 0.1)
+    end, function() showThingsWhenReady(app) end, 0.1)
     return
   end
 
@@ -133,7 +126,7 @@ local function toggleThings()
   if app:isHidden() or not thingsWindow(app) then
     app:unhide()
     if not thingsWindow(app) then hs.application.launchOrFocusByBundleID(things.bundleID) end
-    slideInWhenReady(app)
+    showThingsWhenReady(app)
     return
   end
 
@@ -142,9 +135,9 @@ local function toggleThings()
   -- clicked into — brings it here.
   local win = thingsWindow(app)
   if hs.window.focusedWindow() == win then
-    slideOut(app, win)
+    putAwayThings(win)
   else
-    slideIn(app, win)
+    showThings(app, win)
   end
 end
 
@@ -159,7 +152,7 @@ do
   things.parked = win ~= nil and aerospaceWindow(win, "workspace") == things.parking
 end
 
--- cmd-tab and the Dock slide it in too. Either one focuses the parked window,
+-- cmd-tab and the Dock show it too. Either one focuses the parked window,
 -- and AeroSpace answers that by switching to the parking workspace, a moment
 -- later. Moved onto the focused workspace before then, there is nowhere to
 -- switch to; if AeroSpace got there first, it is sent back where it came from.
@@ -174,6 +167,6 @@ things.watcher = hs.application.watcher.new(function(_, event, app)
   if aerospaceRun("list-workspaces --focused") == things.parking then
     aerospaceRun("workspace-back-and-forth")
   end
-  slideIn(app, win)
+  showThings(app, win)
 end)
 things.watcher:start()
